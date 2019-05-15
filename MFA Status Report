@@ -186,4 +186,6 @@ Else
   Write-Host No user found that matches your criteria.
 }
 #Clean up session 
-#Get-PSSession | Remove-PSSession
+Get-PSSession | Remove-PSSession
+#Clean up session 
+Get-PSSession | Remove-PSSession
