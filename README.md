@@ -1,2 +1,2 @@
 # powershell-scripts
-Office 365 Reporting PowerShell Scripts
+Office 365 PowerShell Scripts
