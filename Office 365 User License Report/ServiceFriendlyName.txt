@@ -1,0 +1,90 @@
+MCOEV 
+Cloud PBX
+MCOPSTN2
+PSTN International
+mcomeetadv
+PSTN Conf
+^mco
+Skype
+Voice
+Skype
+microsoftcommunicationonline
+Skype
+^rms
+Azure Rights Management
+officesubscription
+Office Pro+
+crm
+CRM
+onedrive
+One Drive
+yammer
+Yammer
+sway
+Sway
+multifactorservice
+Multi Factor Service
+mfa
+Multi Factor Service
+aadpremiumservice
+AAD Premium Service
+sco
+SCO
+projectworkmanagement
+Project Work Mgmt
+netbreeze
+NetBreeze
+dynamicsmarketing
+Dynamics Marketing
+adallom
+Cloud App Security
+teams
+Teams
+powerapps
+Power Apps
+^flow
+Flow
+^processsimple
+Flow
+intune
+Moblile Device Mgmt
+atp
+ATP
+bi_azure_p2
+Power BI Pro
+equivio
+Equivio
+lockbox
+Lockbox
+exchange_analytics
+Exch Analytics
+forms
+Forms
+EXCHANGE_S_ARCHIVE 
+Exch Archive
+VISIOCLIENT
+Visio Pro
+PROJECTCLIENT
+Project Pro
+todo
+To-Do
+to-do
+To-Do
+deskless
+Deskless
+stream
+Stream
+THREAT_INTELLIGENCE
+Threat Intelligence
+SHAREPOINTWAC
+Office Web Apps
+^exchange
+Exchange
+^share
+SharePoint
+office
+Office
+^powerbi
+Power BI
+azureanalysis
+Power BI
