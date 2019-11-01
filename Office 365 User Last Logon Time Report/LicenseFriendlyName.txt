@@ -119,5 +119,5 @@ RightsManagemnt =AZURE INFORMATION PROTECTION PLAN 1
 DYN365_ENTERPRISE_CUSTOMER_SERVICE =DYNAMICS 365 FOR CUSTOMER SERVICE ENTERPRISE EDITION
 POWERFLOW_P1 = Microsoft PowerApps Plan 1
 	POWERFLOW_P2 = Microsoft PowerApps Plan 2
-    AAD_PREMIUM_P1 = Azure Active Directory Premium P2
+    AAD_PREMIUM_P1 = Azure Active Directory Premium P1
 	AAD_PREMIUM_P2 = Azure Active Directory Premium P2
