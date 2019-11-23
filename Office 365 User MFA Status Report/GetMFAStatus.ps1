@@ -8,30 +8,30 @@
     [switch]$AdminOnly,
     [switch]$LicensedUserOnly,
     [Nullable[boolean]]$SignInAllowed = $null,
-    [string]$UserName, 
+    [string]$UserName,
     [string]$Password
 )
 #Check for MSOnline module
-$Modules=Get-Module -Name MSOnline -ListAvailable 
+$Modules=Get-Module -Name MSOnline -ListAvailable
 if($Modules.count -eq 0)
 {
-  Write-Host  Please install MSOnline module using below command: `nInstall-Module MSOnline  -ForegroundColor yellow 
+  Write-Host  Please install MSOnline module using below command: `nInstall-Module MSOnline  -ForegroundColor yellow
   Exit
 }
 
-#Storing credential in script for scheduling purpose/ Passing credential as parameter 
-if(($UserName -ne "") -and ($Password -ne "")) 
-{ 
- $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force 
- $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword 
+#Storing credential in script for scheduling purpose/ Passing credential as parameter
+if(($UserName -ne "") -and ($Password -ne ""))
+{
+ $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+ $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
  Connect-MsolService -Credential $credential
-} 
-else 
-{ 
- Connect-MsolService | Out-Null 
-}  
-$Result=""  
-$Results=@() 
+}
+else
+{
+ Connect-MsolService | Out-Null
+}
+$Result=""
+$Results=@()
 $UserCount=0
 $PrintedUser=0
 
@@ -47,16 +47,17 @@ Get-MsolUser -All | foreach{
  $Upn=$_.UserPrincipalName
  $MFAStatus=$_.StrongAuthenticationRequirements.State
  $MethodTypes=$_.StrongAuthenticationMethods
+ $RolesAssigned=""
  Write-Progress -Activity "`n     Processed user count: $UserCount "`n"  Currently Processing: $DisplayName"
  if($_.BlockCredential -eq "True")
- { 
+ {
   $SignInStatus="False"
  }
  else
  {
   $SignInStatus="True"
  }
- 
+
  #Filter result based on SignIn status
  if(($SignInAllowed -ne $null) -and ([string]$SignInAllowed -ne [string]$SignInStatus))
  {
@@ -71,15 +72,24 @@ Get-MsolUser -All | foreach{
 
  #Check for user's Admin role
  $Roles=(Get-MsolUserRole -UserPrincipalName $upn).Name
- if($Roles.count -eq 0) 
- { 
-  $IsAdmin="False" 
- } 
+ if($Roles.count -eq 0)
+ {
+  $RolesAssigned="No roles"
+  $IsAdmin="False"
+ }
  else
  {
   $IsAdmin="True"
+  foreach($Role in $Roles)
+  {
+   $RolesAssigned=$RolesAssigned+$Role
+   if($Roles.indexof($role) -lt (($Roles.count)-1))
+   {
+    $RolesAssigned=$RolesAssigned+","
+   }
+  }
  }
-  
+
  #Filter result based on Admin users
  if(($AdminOnly.IsPresent) -and ([string]$IsAdmin -eq "False"))
  {
@@ -97,13 +107,13 @@ Get-MsolUser -All | foreach{
 
   #Filter result based on EnforcedOnly filter
   if((([string]$MFAStatus -eq "Enabled") -or ([string]$MFAStatus -eq "Enabled via Conditional Access")) -and ($EnforcedOnly.IsPresent))
-  { 
+  {
    return
   }
-  
+
   #Filter result based on EnabledOnly filter
   if(([string]$MFAStatus -eq "Enforced") -and ($EnabledOnly.IsPresent))
-  { 
+  {
    return
   }
 
@@ -139,7 +149,7 @@ Get-MsolUser -All | foreach{
   }
 
   else
-  { 
+  {
    $ActivationStatus="No"
    $Methods="-"
    $DefaultMFAMethod="-"
@@ -149,55 +159,54 @@ Get-MsolUser -All | foreach{
 
   #Print to output file
   $PrintedUser++
-  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'MFAStatus'=$MFAStatus;'ActivationStatus'=$ActivationStatus;'DefaultMFAMethod'=$DefaultMFAMethod;'AllMFAMethods'=$Methods;'MFAPhone'=$MFAPhone;'MFAEmail'=$MFAEmail;'LicenseStatus'=$_.IsLicensed;'IsAdmin'=$IsAdmin; 'SignInStatus'=$SigninStatus} 
-  $Results= New-Object PSObject -Property $Result 
-  $Results | Select-Object DisplayName,UserPrincipalName,MFAStatus,ActivationStatus,DefaultMFAMethod,AllMFAMethods,MFAPhone,MFAEmail,LicenseStatus,IsAdmin,SignInStatus | Export-Csv -Path $ExportCSVReport -Notype -Append
+  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'MFAStatus'=$MFAStatus;'ActivationStatus'=$ActivationStatus;'DefaultMFAMethod'=$DefaultMFAMethod;'AllMFAMethods'=$Methods;'MFAPhone'=$MFAPhone;'MFAEmail'=$MFAEmail;'LicenseStatus'=$_.IsLicensed;'IsAdmin'=$IsAdmin;'AdminRoles'=$RolesAssigned;'SignInStatus'=$SigninStatus}
+  $Results= New-Object PSObject -Property $Result
+  $Results | Select-Object DisplayName,UserPrincipalName,MFAStatus,ActivationStatus,DefaultMFAMethod,AllMFAMethods,MFAPhone,MFAEmail,LicenseStatus,IsAdmin,AdminRoles,SignInStatus | Export-Csv -Path $ExportCSVReport -Notype -Append
  }
 
- #Check for disabled userwe
+ #Check for MFA disabled user
  elseif(($DisabledOnly.IsPresent) -and ($MFAStatus -eq $Null) -and ($_.StrongAuthenticationMethods.MethodType -eq $Null))
  {
   $MFAStatus="Disabled"
   $Department=$_.Department
   if($Department -eq $Null)
   { $Department="-"}
-  write-host Dept $Department
   $PrintedUser++
-  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'Department'=$Department;'MFAStatus'=$MFAStatus;'LicenseStatus'=$_.IsLicensed;'IsAdmin'=$IsAdmin; 'SignInStatus'=$SigninStatus} 
-  $Results= New-Object PSObject -Property $Result 
-  $Results | Select-Object DisplayName,UserPrincipalName,Department,MFAStatus,LicenseStatus,IsAdmin,SignInStatus | Export-Csv -Path $ExportCSV -Notype -Append
+  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'Department'=$Department;'MFAStatus'=$MFAStatus;'LicenseStatus'=$_.IsLicensed;'IsAdmin'=$IsAdmin;'AdminRoles'=$RolesAssigned; 'SignInStatus'=$SigninStatus}
+  $Results= New-Object PSObject -Property $Result
+  $Results | Select-Object DisplayName,UserPrincipalName,Department,MFAStatus,LicenseStatus,IsAdmin,AdminRoles,SignInStatus | Export-Csv -Path $ExportCSV -Notype -Append
  }
 }
 
-#Open output file after execution 
+#Open output file after execution
 Write-Host `nScript executed successfully
 if((Test-Path -Path $ExportCSV) -eq "True")
 {
- Write-Host "MFA Disabled user report available in: $ExportCSV" 
- $Prompt = New-Object -ComObject wscript.shell  
- $UserInput = $Prompt.popup("Do you want to open output file?",`  
- 0,"Open Output File",4)  
- If ($UserInput -eq 6)  
- {  
-  Invoke-Item "$ExportCSV"  
- } 
+ Write-Host "MFA Disabled user report available in: $ExportCSV"
+ $Prompt = New-Object -ComObject wscript.shell
+ $UserInput = $Prompt.popup("Do you want to open output file?",`
+ 0,"Open Output File",4)
+ If ($UserInput -eq 6)
+ {
+  Invoke-Item "$ExportCSV"
+ }
  Write-Host Exported report has $PrintedUser users
 }
 elseif((Test-Path -Path $ExportCSVReport) -eq "True")
 {
- Write-Host "MFA Enabled user report available in: $ExportCSVReport" 
- $Prompt = New-Object -ComObject wscript.shell  
- $UserInput = $Prompt.popup("Do you want to open output file?",`  
- 0,"Open Output File",4)  
- If ($UserInput -eq 6)  
- {  
-  Invoke-Item "$ExportCSVReport"  
- } 
+ Write-Host "MFA Enabled user report available in: $ExportCSVReport"
+ $Prompt = New-Object -ComObject wscript.shell
+ $UserInput = $Prompt.popup("Do you want to open output file?",`
+ 0,"Open Output File",4)
+ If ($UserInput -eq 6)
+ {
+  Invoke-Item "$ExportCSVReport"
+ }
  Write-Host Exported report has $PrintedUser users
 }
 Else
 {
   Write-Host No user found that matches your criteria.
 }
-#Clean up session 
+#Clean up session
 Get-PSSession | Remove-PSSession
