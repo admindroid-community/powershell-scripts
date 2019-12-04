@@ -52,10 +52,12 @@ Get-MsolUser -All | foreach{
  if($_.BlockCredential -eq "True")
  {
   $SignInStatus="False"
+  $SignInStat="Denied"
  }
  else
  {
   $SignInStatus="True"
+  $SignInStat="Allowed"
  }
 
  #Filter result based on SignIn status
@@ -68,6 +70,15 @@ Get-MsolUser -All | foreach{
  if(($LicensedUserOnly.IsPresent) -and ($_.IsLicensed -eq $False))
  {
   return
+ }
+
+ if($_.IsLicensed -eq $true)
+ {
+  $LicenseStat="Licensed"
+ }
+ else
+ {
+  $LicenseStat="Unlicensed"
  }
 
  #Check for user's Admin role
@@ -117,7 +128,7 @@ Get-MsolUser -All | foreach{
    return
   }
 
-  #Filter result based on MFA enabled via conditional access
+  #Filter result based on MFA enabled via Other source
   if((($MFAStatus -eq "Enabled") -or ($MFAStatus -eq "Enforced")) -and ($ConditionalAccessOnly.IsPresent))
   {
    return
@@ -159,7 +170,7 @@ Get-MsolUser -All | foreach{
 
   #Print to output file
   $PrintedUser++
-  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'MFAStatus'=$MFAStatus;'ActivationStatus'=$ActivationStatus;'DefaultMFAMethod'=$DefaultMFAMethod;'AllMFAMethods'=$Methods;'MFAPhone'=$MFAPhone;'MFAEmail'=$MFAEmail;'LicenseStatus'=$_.IsLicensed;'IsAdmin'=$IsAdmin;'AdminRoles'=$RolesAssigned;'SignInStatus'=$SigninStatus}
+  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'MFAStatus'=$MFAStatus;'ActivationStatus'=$ActivationStatus;'DefaultMFAMethod'=$DefaultMFAMethod;'AllMFAMethods'=$Methods;'MFAPhone'=$MFAPhone;'MFAEmail'=$MFAEmail;'LicenseStatus'=$LicenseStat;'IsAdmin'=$IsAdmin;'AdminRoles'=$RolesAssigned;'SignInStatus'=$SigninStat}
   $Results= New-Object PSObject -Property $Result
   $Results | Select-Object DisplayName,UserPrincipalName,MFAStatus,ActivationStatus,DefaultMFAMethod,AllMFAMethods,MFAPhone,MFAEmail,LicenseStatus,IsAdmin,AdminRoles,SignInStatus | Export-Csv -Path $ExportCSVReport -Notype -Append
  }
@@ -172,7 +183,7 @@ Get-MsolUser -All | foreach{
   if($Department -eq $Null)
   { $Department="-"}
   $PrintedUser++
-  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'Department'=$Department;'MFAStatus'=$MFAStatus;'LicenseStatus'=$_.IsLicensed;'IsAdmin'=$IsAdmin;'AdminRoles'=$RolesAssigned; 'SignInStatus'=$SigninStatus}
+  $Result=@{'DisplayName'=$DisplayName;'UserPrincipalName'=$upn;'Department'=$Department;'MFAStatus'=$MFAStatus;'LicenseStatus'=$LicenseStat;'IsAdmin'=$IsAdmin;'AdminRoles'=$RolesAssigned; 'SignInStatus'=$SigninStat}
   $Results= New-Object PSObject -Property $Result
   $Results | Select-Object DisplayName,UserPrincipalName,Department,MFAStatus,LicenseStatus,IsAdmin,AdminRoles,SignInStatus | Export-Csv -Path $ExportCSV -Notype -Append
  }
