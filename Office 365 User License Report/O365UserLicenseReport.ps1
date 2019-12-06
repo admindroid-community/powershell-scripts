@@ -13,6 +13,10 @@ Function Get_UsersLicenseInfo
   $FriendlyNameOfLicensePlanWithService=""
   $upn=$_.userprincipalname
   $Country=$_.Country
+  if($Country -eq "")
+  {
+   $Country="-"
+  }
   Write-Progress -Activity "`n     Exported user count:$LicensedUserCount "`n"Currently Processing:$upn"
   #Get all asssigned SKU for current user
   $Skus=$_.licenses.accountSKUId
@@ -96,7 +100,7 @@ Function Get_UsersLicenseInfo
  $Output=@{'Displayname'=$_.Displayname;'UserPrincipalName'=$upn;Country=$Country;'LicensePlanWithEnabledService'=$LicensePlanWithEnabledService;
       'FriendlyNameOfLicensePlanAndEnabledService'=$FriendlyNameOfLicensePlanWithService}
  $Outputs= New-Object PSObject -Property $output
- $Outputs | Select-Object Displayname,userprincipalname,Country,LicensePlanWithEnabledService,FriendlyNameOfLicensePlanAndEnabledService | Export-Csv -path $ExportSimpleCSV -NoTypeInformation -Append 
+ $Outputs | Select-Object Displayname,userprincipalname,Country,LicensePlanWithEnabledService,FriendlyNameOfLicensePlanAndEnabledService | Export-Csv -path $ExportSimpleCSV -NoTypeInformation -Append
 }
 
 
