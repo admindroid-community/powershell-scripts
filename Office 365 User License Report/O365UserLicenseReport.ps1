@@ -13,7 +13,7 @@ Function Get_UsersLicenseInfo
   $FriendlyNameOfLicensePlanWithService=""
   $upn=$_.userprincipalname
   $Country=$_.Country
-  if($Country -eq "")
+  if([string]$Country -eq "")
   {
    $Country="-"
   }
