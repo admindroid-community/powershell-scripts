@@ -1,5 +1,4 @@
 ﻿$RegistryPath = "HKLM:\SOFTWARE\Policies\Microsoft\Office\16.0\Common\Officeupdate"
-
 $Name = "preventbinginstall"
 $value = "00000001"
 
