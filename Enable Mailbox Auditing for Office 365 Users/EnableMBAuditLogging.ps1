@@ -3,7 +3,6 @@
    Website      : https://O365reports.com
    For execution steps and usecases: https://o365reports.com/2020/01/21/enable-mailbox-auditing-in-office-365-powershell
 #>
-
 #Accept input paramenters 
 param( 
 [Parameter(Mandatory = $false)]
