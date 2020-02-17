@@ -18,3 +18,13 @@ Following are the available Office 365 PowerShell Scripts
     -Connect to Exchange Online PowerShell Script(Works for MFA too)
 
     -Connect to all Office 365 Services PowerShell Script (Supports MFA)
+
+    -Install all Office 365 PowerShell modules
+    
+    -Office 365 Users Logon History Report
+    
+    -Office 365 Shared Mailbox Permission Report
+    
+    -Office 365 Non-Owner Mailbox Access Report
+    
+    -Office 365 Password Expiry Report
