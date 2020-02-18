@@ -14,7 +14,7 @@ if ((($StartDate -eq $null) -and ($EndDate -ne $null)) -or (($StartDate -ne $nul
 {
  Write-Host `nPlease enter both StartDate and EndDate for Audit log collection -ForegroundColor Red
  exit
-}   
+}
 elseif(($StartDate -eq $null) -and ($EndDate -eq $null))
 {
  $StartDate=(((Get-Date).AddDays(-90))).Date
@@ -25,7 +25,7 @@ else
  $StartDate=[DateTime]$StartDate
  $EndDate=[DateTime]$EndDate
  if($StartDate -lt ((Get-Date).AddDays(-90)))
- { 
+ {
   Write-Host `nAudit log can be retrieved only for past 90 days. Please select a date after (Get-Date).AddDays(-90) -ForegroundColor Red
   Exit
  }
@@ -37,66 +37,66 @@ else
 }
 
 
-#Authentication using MFA 
-if($MFA.IsPresent) 
-{ 
- $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1) 
- If ($MFAExchangeModule -eq $null) 
- { 
-  Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow  
-  Write-Host You can manually install module using below blog : `nhttps://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/ `nOR you can install module directly by entering "Y"`n 
-  $Confirm= Read-Host `nAre you sure you want to install module directly? [Y] Yes [N] No 
-  if($Confirm -match "[Y]") 
-  {  
-   Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application" 
-  } 
-  else 
-  { 
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/' 
-   Exit 
-  } 
-  $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No  
-  if($Confirmation -match "[yY]") 
-  { 
-   $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1) 
-   If ($MFAExchangeModule -eq $null) 
-   { 
-    Write-Host Exchange Online MFA module is not available -ForegroundColor red 
-    Exit 
-   } 
-  } 
-  else 
-  {  
-   Write-Host Exchange Online PowerShell Module is required 
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/' 
-   Exit 
-  }     
- } 
-  
- #Importing Exchange MFA Module 
- . "$MFAExchangeModule" 
- Write-Host Enter credential in prompt to connect to Exchange Online 
- Connect-EXOPSSession -WarningAction SilentlyContinue  
-} 
+#Authentication using MFA
+if($MFA.IsPresent)
+{
+ $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
+ If ($MFAExchangeModule -eq $null)
+ {
+  Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow
+  Write-Host You can manually install module using below blog : `nhttps://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/ `nOR you can install module directly by entering "Y"`n
+  $Confirm= Read-Host `nAre you sure you want to install module directly? [Y] Yes [N] No
+  if($Confirm -match "[Y]")
+  {
+   Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
+  }
+  else
+  {
+   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
+   Exit
+  }
+  $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
+  if($Confirmation -match "[yY]")
+  {
+   $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
+   If ($MFAExchangeModule -eq $null)
+   {
+    Write-Host Exchange Online MFA module is not available -ForegroundColor red
+    Exit
+   }
+  }
+  else
+  {
+   Write-Host Exchange Online PowerShell Module is required
+   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
+   Exit
+  }
+ }
 
-#Authentication using non-MFA 
-else 
-{ 
- #Storing credential in script for scheduling purpose/ Passing credential as parameter 
- if(($UserName -ne "") -and ($Password -ne "")) 
- { 
-  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force 
-  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword 
- } 
- else 
- { 
-  $Credential=Get-Credential -Credential $null 
- }  
- $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue 
- Import-PSSession $Session -AllowClobber -DisableNameChecking | Out-Null 
-} 
+ #Importing Exchange MFA Module
+ . "$MFAExchangeModule"
+ Write-Host Enter credential in prompt to connect to Exchange Online
+ Connect-EXOPSSession -WarningAction SilentlyContinue
+}
 
-$OutputCSV=".\NonOwner-Mailbox-Access-Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
+#Authentication using non-MFA
+else
+{
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter
+ if(($UserName -ne "") -and ($Password -ne ""))
+ {
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+ }
+ else
+ {
+  $Credential=Get-Credential -Credential $null
+ }
+ $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
+ Import-PSSession $Session -AllowClobber -DisableNameChecking | Out-Null
+}
+
+$OutputCSV=".\NonOwner-Mailbox-Access-Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
 $IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
 $CurrentStart=$StartDate
 $CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
@@ -116,7 +116,7 @@ $NonOwnerAccess=0
 Write-Host `nRetrieving audit log from $StartDate to $EndDate... -ForegroundColor Yellow
 
 while($true)
-{ 
+{
  #Write-Host Retrieving audit log between StartDate $CurrentStart to EndDate $CurrentEnd ******* IntervalTime $IntervalTimeInMinutes minutes
  if($CurrentStart -eq $CurrentEnd)
  {
@@ -140,7 +140,7 @@ while($true)
   if($AuditData.LogonType -eq 0)
   {
    continue
-  } 
+  }
 
   #Filter for external access
   if(($IncludeExternalAccess -eq $false) -and ($AuditData.ExternalAccess -eq $true))
@@ -149,7 +149,7 @@ while($true)
   }
 
   #Processing non-owner mailbox access records
-  if(($AuditData.LogonUserId -ne $AuditData.MailboxOwnerSid) -or ((($AuditData.Operation -eq "SendAs") -or ($AuditData.Operation -eq "SendOnBehalf")) -and ($AuditData.UserType -eq 0)))
+  if(($AuditData.LogonUserSId -ne $AuditData.MailboxOwnerSid) -or ((($AuditData.Operation -eq "SendAs") -or ($AuditData.Operation -eq "SendOnBehalf")) -and ($AuditData.UserType -eq 0)))
   {
    $AuditData.CreationTime=(Get-Date($AuditData.CreationTime)).ToLocalTime()
    if($AuditData.LogonType -eq 1)
@@ -208,7 +208,7 @@ while($true)
    {
     Write-Host Proceeding audit log collection with data loss
    }
-  } 
+  }
   #Check for last iteration
   if(($CurrentEnd -eq $EndDate))
   {
@@ -225,7 +225,7 @@ while($true)
   {
    $CurrentEnd=$EndDate
   }
-  
+
   $CurrentResultCount=0
   $CurrentResult = @()
  }
@@ -239,15 +239,15 @@ If($AggregateResults -eq 0)
 else
 {
  Write-Host `nThe output file contains $NonOwnerAccess audit records
- if((Test-Path -Path $OutputCSV) -eq "True") 
+ if((Test-Path -Path $OutputCSV) -eq "True")
  {
   Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
-  $Prompt = New-Object -ComObject wscript.shell   
-  $UserInput = $Prompt.popup("Do you want to open output file?",`   
- 0,"Open Output File",4)   
-  If ($UserInput -eq 6)   
-  {   
-   Invoke-Item "$OutputCSV"   
-  } 
+  $Prompt = New-Object -ComObject wscript.shell
+  $UserInput = $Prompt.popup("Do you want to open output file?",`
+ 0,"Open Output File",4)
+  If ($UserInput -eq 6)
+  {
+   Invoke-Item "$OutputCSV"
+  }
  }
 }
