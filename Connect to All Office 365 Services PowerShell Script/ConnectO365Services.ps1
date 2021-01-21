@@ -3,8 +3,8 @@ Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$Disconnect,
-    [ValidateSet('AzureAD','ExchangeOnline','SharePoint','SecAndCompCenter','Skype','Teams')]
-    [string[]]$Services=("AzureAD","ExchangeOnline",'SharePoint','SecAndCompCenter','Skype','Teams'),
+    [ValidateSet('AzureAD','MSOnline','ExchangeOnline','SharePoint','SharePointPnP','SecAndCompCenter','Skype','Teams')]
+    [string[]]$Services=("AzureAD","MSOnline","ExchangeOnline",'SharePoint','SharePointPnP','SecAndCompCenter','Skype','Teams'),
     [string]$SharePointHostName,
     [Switch]$MFA,
     [string]$UserName, 
@@ -37,7 +37,7 @@ else
   $Credential=Get-Credential -Credential $null
  } 
  $ConnectedServices=""
- if($Services.Length -eq 6)
+ if($Services.Length -eq 8)
  {
   $RequiredServices=$Services  
  }
@@ -55,61 +55,42 @@ else
    #Module and Connection settings for Exchange Online module
    ExchangeOnline
    {
-    if($MFA.IsPresent)
+    $Module=Get-InstalledModule -Name ExchangeOnlineManagement -MinimumVersion 2.0.3
+    if($Module.count -eq 0)
     {
-     $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-     If ($MFAExchangeModule -eq $null)
+     Write-Host Required Exchange Online'(EXO V2)' module is not available  -ForegroundColor yellow 
+     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
+     if($Confirm -match "[yY]")
      {
-      Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow
-      Write-Host You can install module using below blog : `nLink `nOR you can install module directly by entering "Y"`n
-      $Confirm= Read-Host Are you sure you want to install module directly? [Y] Yes [N] No
-      if($Confirm -match "[yY]")
-      {
-       Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
-      }
-      else
-      {
-       Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-      }
-      $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
-      if($Confirmation -match "[yY]")
-      {
-       $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-       If ($MFAExchangeModule -eq $null)
-       {
-        Write-Host Exchange Online MFA module is not available -ForegroundColor red
-        Exit
-       }
-      }
-      else
-      { 
-       Write-Host Exchange Online PowerShell Module is required
-       Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-      }   
+      Install-Module ExchangeOnlineManagement
+      Import-Module ExchangeOnlineManagement
      }
-  
-     #Importing Exchange MFA Module
-     . "$MFAExchangeModule"
-     Connect-EXOPSSession -WarningAction SilentlyContinue | Out-Null
+     else
+     {
+      Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet.
+     }
+     Continue
+    }
+    if($mfa.IsPresent)
+    {
+     Connect-ExchangeOnline
     }
     else
     {
-     $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
-     Import-PSSession $Session -DisableNameChecking -AllowClobber -WarningAction SilentlyContinue | Out-Null
+     Connect-ExchangeOnline -Credential $Credential
     }
-    #Check for Exchange Online connectivity
-    If((Get-PSSession | Where-Object { $_.ConfigurationName -like "Microsoft.Exchange" }) -ne $null)
+    If((Get-EXOMailbox -ResultSize 1) -ne $null)
     {
      if($ConnectedServices -ne "")
      {
       $ConnectedServices=$ConnectedServices+","
-     } 
-     $ConnectedServices=$ConnectedServices+"Exchange Online"      
+     }
+     $ConnectedServices=$ConnectedServices+" Exchange Online"
     }
-   } 
+   }
 
-   #Module and Connection settings for AzureAD module
-   AzureAD
+  #Module and Connection settings for AzureAD V1 (MSOnline module)
+   MSOnline
    {
     $Module=Get-Module -Name MSOnline -ListAvailable 
     if($Module.count -eq 0)
@@ -119,6 +100,7 @@ else
      if($Confirm -match "[yY]")
      {
       Install-Module MSOnline
+      Import-Module MSOnline
      }
      else
      {
@@ -140,12 +122,52 @@ else
      {
       $ConnectedServices=$ConnectedServices+","
      }
-     $ConnectedServices=$ConnectedServices+" AzureAD"
-     if(($RequiredServices -contains "SharePoint") -eq "true")
+     $ConnectedServices=$ConnectedServices+" MSOnline"
+    }
+    if(($RequiredServices -contains "SharePoint") -eq "true")
      {
       $SharePointHostName=((Get-MsolDomain) | where {$_.IsInitial -eq "True"} ).name -split ".onmicrosoft.com"
       $SharePointHostName=($SharePointHostName).trim()
      }
+   }
+
+
+
+   #Module and Connection settings for AzureAD V2 (AzureAD module)
+   AzureAD
+   {
+    $Module=Get-Module -Name AzureAD -ListAvailable 
+    if($Module.count -eq 0)
+    {
+     Write-Host AzureAD module is not available  -ForegroundColor yellow 
+     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
+     if($Confirm -match "[yY]")
+     {
+      Install-Module AzureAD
+      Import-Module AzureAD
+     }
+     else
+     {
+      Write-Host AzureAD module is required to connect AzureAD.Please install module using Install-Module AzureAD cmdlet.
+     }
+     Continue
+    }
+    if($mfa.IsPresent)
+    {
+     Connect-AzureAD
+    }
+    else
+    {
+     Connect-AzureAD -Credential $Credential
+    }
+    If((Get-AzureADUser -Top 1) -ne $null)
+    {
+     if($ConnectedServices -ne "")
+     {
+      $ConnectedServices=$ConnectedServices+","
+     }
+     $ConnectedServices=$ConnectedServices+" AzureAD"
+     
     }
    }
 
@@ -193,14 +215,67 @@ else
     }
    }
 
+   #Module and Connection settings for Sharepoint PnP module
+   SharePointPnP
+   {
+    $Module=Get-InstalledModule -Name SharePointPnPPowerShellOnline
+    if($Module.count -eq 0)
+    {
+     Write-Host SharePoint PnP module module is not available  -ForegroundColor yellow 
+     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
+     if($Confirm -match "[yY]")
+     {
+      Install-Module -Name SharePointPnPPowerShellOnline -AllowClobber
+     }
+     else
+     {
+      Write-Host SharePoint Pnp module is required.Please install module using Install-Module SharePointPnPPowerShellOnline cmdlet.
+     }
+     Continue
+    }
+    if(!($PSBoundParameters['SharePointHostName']) -and ([string]$SharePointHostName -eq "") ) 
+    {
+     Write-Host SharePoint organization name is required.`nEg: Contoso for admin@Contoso.com -ForegroundColor Yellow
+     $SharePointHostName= Read-Host "Please enter SharePoint organization name"  
+    }
+     
+    if($MFA.IsPresent)
+    {
+     Import-Module SharepointpnpPowerShellOnline -DisableNameChecking
+     Connect-PnPOnline -Url https://$SharePointHostName.sharepoint.com -UseWebLogin -WarningAction Ignore
+    }
+    else
+    {
+     Import-Module SharepointpnpPowerShellOnline -DisableNameChecking
+     Connect-PnPOnline -Url https://$SharePointHostName.sharepoint.com -credential $credential -WarningAction Ignore
+    } 
+    If ($? -eq $true)
+    {
+     if($ConnectedServices -ne "")
+     {
+      $ConnectedServices=$ConnectedServices+","
+     }
+     $ConnectedServices=$ConnectedServices+"SharePoint PnP"  
+    }
+   }
+
+
    #Module and Connection settings for Skype for Business Online module
    Skype
    { 
-    $Module=Get-Module -Name SkypeOnlineConnector -ListAvailable
+    $Module=Get-InstalledModule -Name MicrosoftTeams -MinimumVersion 1.1.6 
     if($Module.count -eq 0)
     {
-     Write-Host  Please install Skype for Business Online,Windows PowerShell Module  -ForegroundColor yellow 
-     Write-Host `nYou can download the Skype Online PowerShell module directly using below url: https://download.microsoft.com/download/2/0/5/2050B39B-4DA5-48E0-B768-583533B42C3B/SkypeOnlinePowerShell.Exe
+     Write-Host Required MicrosoftTeams module is not available  -ForegroundColor yellow 
+     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
+     if($Confirm -match "[yY]")
+     {
+      Install-Module MicrosoftTeams -AllowClobber
+     }
+     else
+     {
+      Write-Host MicrosoftTeams module is required.Please install module using Install-Module MicrosoftTeams cmdlet.
+     }
      Continue
     }
     if($MFA.IsPresent)
@@ -227,78 +302,52 @@ else
    #Module and Connection settings for Security & Compliance center
    SecAndCompCenter
    {
-    if($MFA.IsPresent)
+    $Module=Get-InstalledModule -Name ExchangeOnlineManagement -MinimumVersion 2.0.3
+    if($Module.count -eq 0)
     {
-     $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-     If ($MFAExchangeModule -eq $null)
+     Write-Host Exchange Online'(EXO V2)' module is not available  -ForegroundColor yellow 
+     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
+     if($Confirm -match "[yY]")
      {
-      Write-Host  `nPlease install Exchange Online MFA Module to connect Security and Compliance PowerShell with MFA.  -ForegroundColor yellow
-      Write-Host You can install module using below blog : `nLink `nOR you can install module directly by entering "Y"`n
-      $Confirm= Read-Host Are you sure you want to install module directly? [Y] Yes [N] No
-      if($Confirm -match "[yY]")
-      {
-       Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
-      }
-      else
-      {
-       Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-      }
-      $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
-      if($Confirmation -match "[yY]")
-      {
-       $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-       If ($MFAExchangeModule -eq $null)
-       {
-        Write-Host Exchange Online MFA module is not available -ForegroundColor red
-        Exit
-       }
-      }
-      else
-      { 
-       Write-Host Exchange Online PowerShell Module is required to connect Security and Compliance PowerShell with MFA
-       Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-      }   
-     }
-  
-     #Importing Exchange MFA Module
-     . "$MFAExchangeModule"
-     if([string]($Services -contains "ExchangeOnline") -eq "False")
-     {  
-      Connect-IPPSSession
+      Install-Module ExchangeOnlineManagement
+      Import-Module ExchangeOnlineManagement
      }
      else
      {
-      $SCCSession = New-ExoPSSession -ConnectionUri "https://ps.compliance.protection.outlook.com/PowerShell-LiveId" -WarningAction SilentlyContinue 
-      Import-PSSession $SCCSession -WarningAction SilentlyContinue -AllowClobber -DisableNameChecking | Out-Null
-     } 
+      Write-Host EXO V2 module is required to connect Security and Compliance PowerShell.Please install module using Install-Module ExchangeOnlineManagement cmdlet.
+     }
+     Continue
+    }
+    if($mfa.IsPresent)
+    {
+     Connect-IPPSSession -WarningAction SilentlyContinue
     }
     else
     {
-     $SCSession = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://ps.compliance.protection.outlook.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
-     Import-PSSession $SCSession -AllowClobber -DisableNameChecking -WarningAction SilentlyContinue | Out-Null
+     Connect-IPPSSession -Credential $Credential -WarningAction SilentlyContinue
     }
-    #Check for compliance center connectivity
-    If((Get-PSSession | Where-Object { $_.ConfigurationName -like "Microsoft.Exchange" }) -ne $null)
+    $Result=Get-RetentionCompliancePolicy
+    If(($?) -eq $true)
     {
      if($ConnectedServices -ne "")
      {
       $ConnectedServices=$ConnectedServices+","
      }
-     $ConnectedServices=$ConnectedServices+"Security & Compliance Center"
+     $ConnectedServices=$ConnectedServices+" Security & Compliance Center"
     }
    }
-
+  
    #Module and Connection settings for Teams Online module
    Teams
    {
-    $Module=Get-Module -Name MicrosoftTeams -ListAvailable 
+    $Module=Get-InstalledModule -Name MicrosoftTeams -MinimumVersion 1.1.6 
     if($Module.count -eq 0)
     {
-     Write-Host MicrosoftTeams module is not available  -ForegroundColor yellow 
+     Write-Host Required MicrosoftTeams module is not available  -ForegroundColor yellow 
      $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
      if($Confirm -match "[yY]")
      {
-      Install-Module MicrosoftTeams
+      Install-Module MicrosoftTeams -AllowClobber
      }
      else
      {
