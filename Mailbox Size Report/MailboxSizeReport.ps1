@@ -1,4 +1,14 @@
-﻿Param
+﻿<#
+=============================================================================================
+Name:           Microsoft 365 Mailbox Size Report
+Description:    This script exports Microsoft 365 mailbox size report to CSV
+Version:        2.0
+website:        o365reports.com
+Script by:      O365Reports Team
+For detailed Script execution: https://o365reports.com/2020/10/21/export-office-365-mailbox-size-report-using-powershell/
+============================================================================================
+#>
+Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$MFA,
@@ -12,7 +22,6 @@
 Function Get_MailboxSize
 {
  $Stats=Get-MailboxStatistics -Identity $UPN
- $IsArchieved=$Stats.IsArchiveMailbox
  $ItemCount=$Stats.ItemCount
  $TotalItemSize=$Stats.TotalItemSize
  $TotalItemSizeinBytes= $TotalItemSize –replace “(.*\()|,| [a-z]*\)”, “”
@@ -21,9 +30,9 @@ Function Get_MailboxSize
  $TotalDeletedItemSize=$Stats.TotalDeletedItemSize
 
  #Export result to csv
- $Result=@{'Display Name'=$DisplayName;'User Principal Name'=$upn;'Mailbox Type'=$MailboxType;'Primary SMTP Address'=$PrimarySMTPAddress;'IsArchieved'=$IsArchieved;'Item Count'=$ItemCount;'Total Size'=$TotalSize;'Total Size (Bytes)'=$TotalItemSizeinBytes;'Deleted Item Count'=$DeletedItemCount;'Deleted Item Size'=$TotalDeletedItemSize;'Issue Warning Quota'=$IssueWarningQuota;'Prohibit Send Quota'=$ProhibitSendQuota;'Prohibit send Receive Quota'=$ProhibitSendReceiveQuota}
+ $Result=@{'Display Name'=$DisplayName;'User Principal Name'=$upn;'Mailbox Type'=$MailboxType;'Primary SMTP Address'=$PrimarySMTPAddress;'Archive Status'=$Archivestatus;'Item Count'=$ItemCount;'Total Size'=$TotalSize;'Total Size (Bytes)'=$TotalItemSizeinBytes;'Deleted Item Count'=$DeletedItemCount;'Deleted Item Size'=$TotalDeletedItemSize;'Issue Warning Quota'=$IssueWarningQuota;'Prohibit Send Quota'=$ProhibitSendQuota;'Prohibit send Receive Quota'=$ProhibitSendReceiveQuota}
  $Results= New-Object PSObject -Property $Result  
- $Results | Select-Object 'Display Name','User Principal Name','Mailbox Type','Primary SMTP Address','Item Count','Total Size','Total Size (Bytes)','IsArchieved','Deleted Item Count','Deleted Item Size','Issue Warning Quota','Prohibit Send Quota','Prohibit Send Receive Quota' | Export-Csv -Path $ExportCSV -Notype -Append 
+ $Results | Select-Object 'Display Name','User Principal Name','Mailbox Type','Primary SMTP Address','Item Count','Total Size','Total Size (Bytes)','Archive Status','Deleted Item Count','Deleted Item Size','Issue Warning Quota','Prohibit Send Quota','Prohibit Send Receive Quota' | Export-Csv -Path $ExportCSV -Notype -Append 
 }
 
 Function main()
@@ -93,6 +102,15 @@ Function main()
    $IssueWarningQuota=$MBDetails.IssueWarningQuota -replace "\(.*",""
    $ProhibitSendQuota=$MBDetails.ProhibitSendQuota -replace "\(.*",""
    $ProhibitSendReceiveQuota=$MBDetails.ProhibitSendReceiveQuota -replace "\(.*",""
+   #Check for archive enabled mailbox
+   if(($MBDetails.ArchiveDatabase -eq $null) -and ($MBDetails.ArchiveDatabaseGuid -eq $MBDetails.ArchiveGuid))
+   {
+    $ArchiveStatus = "Disabled"
+   }
+   else
+   {
+    $ArchiveStatus= "Active"
+   }
    $MBCount++
    Write-Progress -Activity "`n     Processed mailbox count: $MBCount "`n"  Currently Processing: $DisplayName"
    Get_MailboxSize
@@ -121,6 +139,15 @@ Function main()
    {
     return
    }  
+   #Check for archive enabled mailbox
+   if(($_.ArchiveDatabase -eq $null) -and ($_.ArchiveDatabaseGuid -eq $_.ArchiveGuid))
+   {
+    $ArchiveStatus = "Disabled"
+   }
+   else
+   {
+    $ArchiveStatus= "Active"
+   }
    Get_MailboxSize
    $PrintedMBCount++
   }
