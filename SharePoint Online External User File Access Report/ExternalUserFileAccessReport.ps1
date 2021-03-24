@@ -1,4 +1,13 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           Office 365 external user file access report
+Description:    This script exports SharePoint Online external user file access report to CSV
+Version:        1.0
+Website:        o365reports.com
+Script by:      O365Reports Team
+For detailed script execution: https://o365reports.com/2021/03/23/audit-external-user-file-access-in-sharepoint-online-using-powershell
+============================================================================================
+#>
 Param
 (
     [Parameter(Mandatory = $false)]
