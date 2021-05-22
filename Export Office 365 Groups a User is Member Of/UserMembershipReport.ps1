@@ -1,4 +1,13 @@
-
+<#
+=============================================================================================
+Name:           Office365 User Membership Report Using PowerShell
+Description:    This script exports Office 365 user's group details to CSV
+Version:        1.0
+Website:        o365reports.com
+Script by:      O365Reports Team
+For detailed script execution:https://o365reports.com/2021/04/15/export-office-365-groups-a-user-is-member-of-using-powershell/
+============================================================================================
+#>
 param
 (
     [string] $UserName = $null,
