@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
-Name:           Office 365 external user file access report
-Description:    This script exports SharePoint Online external user file access report to CSV
+Name:           Audit Office 365 external sharing activities report
+Description:    This script exports Office 365 external sharing activities to CSV
 Version:        1.0
 Website:        o365reports.com
 Script by:      O365Reports Team
