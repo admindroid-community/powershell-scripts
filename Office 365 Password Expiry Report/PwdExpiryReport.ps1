@@ -60,7 +60,7 @@ foreach($Domain in $Domains)
  }
  else
  {
-  $PwdValidity=(Get-MsolPasswordPolicy -DomainName $Domain -ErrorAction SilentlyContinue ).ValidityPeriod
+  $PwdValidity=(Get-MsolPasswordPolicy -DomainName $Domain.Name -ErrorAction SilentlyContinue ).ValidityPeriod
   if($PwdValidity -eq $null)
   {                                 
    $PwdValidity=90
