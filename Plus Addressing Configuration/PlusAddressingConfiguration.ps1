@@ -31,7 +31,7 @@
  if($CheckStatus.IsPresent)
  {
   $Status=Get-OrganizationConfig | select AllowPlusAddressInRecipients 
-  if($Status -eq $true)
+  if($Status.AllowPlusAddressInRecipients -eq $true)
   {
    Write-Host Currently, Plus Addressing is enabled in your organization.
   }
