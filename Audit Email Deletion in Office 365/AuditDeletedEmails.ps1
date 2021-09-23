@@ -1,4 +1,12 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           Audit Email Deletion in Office 365
+Description:    This script exports deleted emails audit records to CSV
+website:        o365reports.com
+Script by:      O365Reports Team
+For detailed Script execution: https://o365reports.com/2021/09/02/audit-email-deletion-in-office-365-mailbox-powershell
+============================================================================================
+#>
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -140,7 +148,7 @@ while($true)
  $ResultCount=0
  #Getting email deleted audit data for given time range
  Search-UnifiedAuditLog -StartDate $CurrentStart -EndDate $CurrentEnd -Operations $RetriveOperation -SessionId s -SessionCommand ReturnLargeSet -ResultSize 5000 | ForEach-Object {
-  $currentResultCount=$CurrentResultCount+$ResultCount
+  
   $ResultCount++
   $ProcessedAuditCount++
   Write-Progress -Activity "`n     Retrieving email deletion activities from $CurrentStart to $CurrentEnd.."`n" Processed audit record count: $ProcessedAuditCount"
@@ -181,7 +189,7 @@ while($true)
   $ExportResults= New-Object PSObject -Property $ExportResult  
   $ExportResults | Select-Object 'Activity Time','Activity','Target Mailbox','Performed By','No. of Emails Deleted','Email Subjects','Folder','Result Status','More Info' | Export-Csv -Path $OutputCSV -Notype -Append 
  }
- 
+ $currentResultCount=$CurrentResultCount+$ResultCount
  if($CurrentResultCount -ge 50000)
  {
   Write-Host Retrieved max record for current range.Proceeding further may cause data loss or rerun the script with reduced time interval. -ForegroundColor Red
@@ -246,12 +254,6 @@ else
   } 
  }
 }
-<#
 
-=============================================================================================
-For detailed Script execution: https://o365reports.com/2021/09/02/audit-email-deletion-in-office-365-mailbox-powershell
-============================================================================================
-
-#>
 #Disconnect Exchange Online session
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
