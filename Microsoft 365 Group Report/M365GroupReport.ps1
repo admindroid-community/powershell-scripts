@@ -169,7 +169,7 @@ Function main()
  $Count=0
 
  #Check for input file
- if([string]$GroupIDssFile -ne "") 
+ if([string]$GroupIDsFile -ne "") 
  { 
   #We have an input file, read it into memory 
   $DG=@()
