@@ -42,7 +42,7 @@ function CSVImport {
  }
 }
 function ExportOutput {
- $ArchiveMailboxSize = ((Get-MailboxStatistics -Identity $UserData.Alias -Archive -WarningAction SilentlyContinue).TotalItemSize)
+ $ArchiveMailboxSize = ((Get-MailboxStatistics -Identity $UserData.UserPrincipalName -Archive -WarningAction SilentlyContinue).TotalItemSize)
  if($null -ne $ArchiveMailboxSize) 
  {
   $ArchiveMailboxSize = $ArchiveMailboxSize.ToString().split("()")
