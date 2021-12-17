@@ -246,6 +246,7 @@ else
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
   Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
+  Write-Host `nFor more Office 365 related PowerShell scripts, check https://o365reports.com -ForegroundColor Cyan
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -258,3 +259,14 @@ else
 
 #Disconnect Exchange Online session
  Disconnect-ExchangeOnline -Confirm:$false | Out-Null
+
+
+ <#
+=============================================================================================
+Name:           Audit user activity in Office 365
+website:        o365reports.com
+For detailed Script execution: https://o365reports.com/2021/01/06/export-office-365-user-activity-report-to-csv-using-powershell/
+
+============================================================================================
+#>
+ 
