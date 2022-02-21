@@ -1,4 +1,12 @@
-﻿Param 
+﻿<#
+=============================================================================================
+Name:           Export Office 365 Users’ Last Password Change Date to CSV 
+website:        o365reports.com
+Script by:      O365Reports Team
+For detailed Script execution: https://o365reports.com/2020/02/17/export-office-365-users-last-password-change-date-to-csv
+============================================================================================
+#>
+Param 
 ( 
     [Parameter(Mandatory = $false)] 
     [switch]$PwdNeverExpires, 
@@ -6,6 +14,7 @@
     [switch]$LicensedUserOnly, 
     [int]$SoonToExpire, 
     [int]$RecentPwdChanges,
+    [switch]$EnabledUsersOnly,
     [string]$UserName,  
     [string]$Password 
 ) 
@@ -95,6 +104,14 @@ Get-MsolUser -All | foreach{
   $LicenseStatus="Unlicensed"
  }
  
+ if($_.BlockCredential -eq $true)
+ {
+  $AccountStatus="Disabled"
+ }
+ else
+ {
+  $AccountStatus="Enabled"
+ }
 
  #Finding password validity period for user
  $UserDomain= $UPN -Split "@" | Select-Object -Last 1 
@@ -145,8 +162,14 @@ Get-MsolUser -All | foreach{
  #Calculating Password since last set
  $PwdSinceLastSet=(New-TimeSpan -Start $PwdLastChange).Days
 
+ #Filter for enabled users
+ if(($EnabledUsersOnly.IsPresent) -and ($AccountStatus -eq "Disabled"))
+ {
+  return
+ }
+
  #Filter for user with Password nerver expires
- if(($PwdNeverExpires.IsPresent) -and ($PwdNeverExpire=$false))
+ if(($PwdNeverExpires.IsPresent) -and ($PwdNeverExpire -eq $false))
  {
   return
  }
@@ -184,9 +207,9 @@ Get-MsolUser -All | foreach{
  $PrintedUser++ 
  
  #Export result to csv
- $Result=@{'Display Name'=$DisplayName;'User Principal Name'=$upn;'Pwd Last Change Date'=$PwdLastChange;'Days since Pwd Last Set'=$PwdSinceLastSet;'Pwd Expiry Date'=$PwdExpiryDate;'Days since Expiry(-) / Days to Expiry(+)'=$PwdExpiresIn ;'Friendly Expiry Time'=$PwdExpireIn;'License Status'=$LicenseStatus}
+ $Result=@{'Display Name'=$DisplayName;'User Principal Name'=$upn;'Pwd Last Change Date'=$PwdLastChange;'Days since Pwd Last Set'=$PwdSinceLastSet;'Pwd Expiry Date'=$PwdExpiryDate;'Days since Expiry(-) / Days to Expiry(+)'=$PwdExpiresIn ;'Friendly Expiry Time'=$PwdExpireIn;'License Status'=$LicenseStatus;'Account Status'=$AccountStatus}
  $Results= New-Object PSObject -Property $Result  
- $Results | Select-Object 'Display Name','User Principal Name','Pwd Last Change Date','Days since Pwd Last Set','Pwd Expiry Date','Friendly Expiry Time','License Status','Days since Expiry(-) / Days to Expiry(+)' | Export-Csv -Path $ExportCSV -Notype -Append 
+ $Results | Select-Object 'Display Name','User Principal Name','Pwd Last Change Date','Days since Pwd Last Set','Pwd Expiry Date','Friendly Expiry Time','License Status','Days since Expiry(-) / Days to Expiry(+)','Account Status' | Export-Csv -Path $ExportCSV -Notype -Append 
 }
 
 If($UserCount -eq 0)
