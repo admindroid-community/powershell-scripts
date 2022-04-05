@@ -1,68 +1,29 @@
-<<<<<<< HEAD
-﻿Param
+﻿<#
+=============================================================================================
+Name:           Export Office 365 mail traffic statistics by user report
+Description:    This script exports mails sent, received, spam received and malware received statistics by users to CSV file
+Version:        3.0
+Website:        o365reports.com
+Script by:      O365Reports Team
+For detailed script execution: https://o365reports.com/2020/08/12/export-office-365-mail-traffic-report-with-powershell/
+============================================================================================
+#>
+Param
 (
     [Parameter(Mandatory = $false)]
-    [switch]$MFA,
+    [switch]$NoMFA,
     [switch]$OnlyOrganizationUsers,
     [Nullable[DateTime]]$StartDate,
     [Nullable[DateTime]]$EndDate,
+    [switch]$MailsSent,
+    [switch]$SpamsReceived,
+    [switch]$MalwaresReceived,
     [string]$UserName,
     [string]$Password
 )
 
-#Print Output
-function Print_Output
+Function Install_Modules
 {
- $AllMailTraffic=@{'Date'=$PreviousDate;'User Principal Name'=$PreviousName;'Mails Sent'=$MailsSent;'Mails Received'=$MailsReceived}
- $AllMailTrafficData= New-Object PSObject -Property $AllMailTraffic
- $AllMailTrafficData | select Date,'User Principal Name','Mails Sent','Mails Received' | Export-Csv $OutputCSV -NoTypeInformation -Append
- $Print=1
-}
-
-#Get inbound and outbound mail count
-function Get_MailCount
-{ 
- if($MailTraffic.Direction -eq "Inbound")
- {
-  $Global:MailsReceived += $MailTraffic.MessageCount
- }
- else
- {
-  $Global:MailsSent += $MailTraffic.MessageCount
- }
- $Print=0
-}
-
-function main{
-
-
- #Getting StartDate and EndDate for mail traffic collection
- if ((($StartDate -eq $null) -and ($EndDate -ne $null)) -or (($StartDate -ne $null) -and ($EndDate -eq $null)))
- {
-  Write-Host `nPlease enter both StartDate and EndDate for mail traffic data collection -ForegroundColor Red
-  exit
- }
- elseif(($StartDate -eq $null) -and ($EndDate -eq $null))
- {
-  $StartDate=(((Get-Date).AddDays(-90))).Date
-  $EndDate=Get-Date
- }
- else
- {
-  $StartDate=[DateTime]$StartDate
-  $EndDate=[DateTime]$EndDate
-  if($StartDate -lt ((Get-Date).AddDays(-90)))
-  {
-   Write-Host `nMail traffic data can be retrieved only for past 90 days. Please select a date after (Get-Date).AddDays(-90) -ForegroundColor Red
-   Exit
-  }
-  if($EndDate -lt ($StartDate))
-  {
-   Write-Host `nEnd time should be later than start time -ForegroundColor Red
-   Exit
-  }
- }
-
  #Check for EXO v2 module inatallation
  $Module = Get-Module ExchangeOnlineManagement -ListAvailable
  if($Module.count -eq 0) 
@@ -73,26 +34,46 @@ function main{
   { 
    Write-host "Installing Exchange Online PowerShell module"
    Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Import-Module ExchangeOnlineManagement
   } 
   else 
   { 
    Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
- } 
+ }  
 
- #Connect Exchange Online with MFA
- if($MFA.IsPresent)
+ if($OnlyOrganizationUsers.IsPresent)
  {
-  Connect-ExchangeOnline
+  #Check for Azure AD module
+  $Module = Get-Module MsOnline -ListAvailable
+  if($Module.count -eq 0) 
+  { 
+   Write-Host MSOnline module is not available  -ForegroundColor yellow  
+   $Confirm= Read-Host Are you sure you want to install the module? [Y] Yes [N] No 
+   if($Confirm -match "[yY]") 
+   { 
+    Write-host "Installing MSOnline PowerShell module"
+    Install-Module MSOnline -Repository PSGallery -AllowClobber -Force
+    Import-Module MSOnline
+   } 
+   else 
+   { 
+    Write-Host MSOnline module is required to generate the report.Please install module using Install-Module MSOnline cmdlet. 
+    Exit
+   }
+  }
  }
+}
 
+
+ Install_Modules
  #Authentication using non-MFA
- else
+ if($NoMFA.IsPresent)
  {
   #Storing credential in script for scheduling purpose/ Passing credential as parameter
   if(($UserName -ne "") -and ($Password -ne ""))
-  {
+  { 
    $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
    $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
   }
@@ -100,329 +81,200 @@ function main{
   {
    $Credential=Get-Credential -Credential $null
   }
-  Connect-ExchangeOnline -Credential $Credential
- }
-
- #Connect to MsolService to get internal domains
- if($OnlyOrganizationUsers.IsPresent)
- {
-  #Connect MsolService
-  if($mfa.IsPresent)
-  {
-   Connect-MsolService
-  }
-  else
-  {
-   Connect-MsolService -Credential $Credential
-  }
-  $Domains=(Get-MsolDomain).Name
- }
-
- #Output file declaration
- $OutputCSV=".\Mail_Traffic_Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
- $AllMailTrafficData=@()
- $AllMailTraffic=""
- $AggregatedMailTrafficData=@()
- $Page=1
- Write-Host Getting mail traffic data...
- Do
- {
-  $MailTrafficData=Get-MailTrafficTopReport -StartDate $StartDate -EndDate $EndDate -Page $Page -PageSize 5000 | Sort-Object Date,Name,Direction
-  $AggregatedMailTrafficData+=$MailTrafficData
-  $Page++
- }While($MailTrafficData.count -eq 5000)
-
- Write-Host The script has found $AggregatedMailTrafficData.count records
- Write-Host Processing Mail traffic data...
- $PreviousDate=$MailTrafficData[0].Date #FirstRecordDate
- $PreviousName=$MailTrafficData[0].Name #FirstRecordName
- $Global:MailsSent=0
- $Global:MailsReceived=0
- $Print=1
- $ProcessedRecords=0
- foreach($MailTraffic in $AggregatedMailTrafficData)
- {
-  $ProcessedRecords++
-  Write-Progress -Activity "`n     Processing Mail traffic data from $StartDate to $EndDate.."`n" Processed record count: $ProcessedRecords"
-  $CurrentDate=$MailTraffic.Date
-  $CurrentName=$MailTraffic.Name
-  $Count=$MailTraffic.MessageCount
-
-  #Filter to get mail traffic for organization's users alone
   if($OnlyOrganizationUsers.IsPresent)
   {
-   $Domain=$CurrentName.Split("@") | Select-Object -Index 1
-   if(($Domain -in $Domains) -eq $false)
-   {
-    continue
-   }
+   Write-Host "Connecting Azure AD..."
+   Connect-MsolService -Credential $Credential | Out-Null
   }
-  if($PreviousDate -eq $CurrentDate)
-  {
-   if($PreviousName -eq $CurrentName)
-   {
-    Get_MailCount -traffic $MailTraffic
-   }
-   else
-   {
-    #Export Output to CSV
-    Print_Output
-    $PreviousName=$CurrentName
-    $Global:MailsReceived=0
-    $Global:MailsSent=0
-    Get_MailCount -Traffic $MailTraffic
-   }
+  Write-Host "Connecting Exchange Online PowerShell..."
+  Connect-ExchangeOnline -Credential $Credential
+ }
+ #Connect to Exchange Online and AzureAD module using MFA 
+ elseif($OnlyOrganizationUsers.IsPresent)
+ {
+  Write-Host "Connecting Exchange Online PowerShell..."
+  Connect-ExchangeOnline
+  Write-Host "Connecting Azure AD..."
+  Connect-MsolService | Out-Null
+ }
+ #Connect to Exchange Online PowerShell
+ else
+ {
+  Write-Host "Connecting Exchange Online PowerShell..."
+  Connect-ExchangeOnline
+ }
+
+
+[DateTime]$MaxStartDate=((Get-Date).AddDays(-89)).Date 
+
+
+<#Getting mail traffic data for past 90 days
+if(($StartDate -eq $null) -and ($EndDate -eq $null))
+{
+ [DateTime]$EndDate=(Get-Date).Date
+ [DateTime]$StartDate=$MaxStartDate
+}
+#>
+
+#Getting start date to audit mail traffic report
+While($true)
+{
+ if ($StartDate -eq $null)
+ {
+  $StartDate=Read-Host Enter start time for report generation '(Eg:03/28/2022)'
+ }
+ Try
+ {
+  $Date=[DateTime]$StartDate
+  if($Date -ge $MaxStartDate)
+  { 
+   break
   }
   else
   {
-   If($Print -eq 0)
-   {
-    #Export Output to CSV
-    Print_Output
-   }
-   $PreviousDate=$CurrentDate
-   $PreviousName=$CurrentName
-   $Global:MailsReceived=0
-   $Global:MailsSent=0
-   Get_MailCount -Traffic $MailTraffic
+   Write-Host `nMail traffic can be retrieved only for past 90 days. Please select a date after $MaxStartDate -ForegroundColor Red
+   return
   }
  }
- #Export Output to CSV
- Print_Output
-
- If($ProcessedRecords -eq 0)
+ Catch
  {
-  Write-Host No records found
- }
- #Open output file after execution
- else
- {
-  if((Test-Path -Path $OutputCSV) -eq "True")
-  {
-   Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
-   $Prompt = New-Object -ComObject wscript.shell
-   $UserInput = $Prompt.popup("Do you want to open output file?",`
- 0,"Open Output File",4)
-   If ($UserInput -eq 6)
-   {
-    Invoke-Item "$OutputCSV"
-   }
-  }
+  Write-Host `nNot a valid date -ForegroundColor Red
  }
 }
 
-=======
-﻿Param
-(
-    [Parameter(Mandatory = $false)]
-    [switch]$MFA,
-    [switch]$OnlyOrganizationUsers,
-    [Nullable[DateTime]]$StartDate,
-    [Nullable[DateTime]]$EndDate,
-    [string]$UserName,
-    [string]$Password
-)
 
-#Print Output
-function Print_Output
+#Getting end date to audit emails report
+While($true)
 {
- $AllMailTraffic=@{'Date'=$PreviousDate;'User Principal Name'=$PreviousName;'Mails Sent'=$MailsSent;'Mails Received'=$MailsReceived}
- $AllMailTrafficData= New-Object PSObject -Property $AllMailTraffic
- $AllMailTrafficData | select Date,'User Principal Name','Mails Sent','Mails Received' | Export-Csv $OutputCSV -NoTypeInformation -Append
- $Print=1
-}
-
-#Get inbound and outbound mail count
-function Get_MailCount
-{ 
- if($MailTraffic.Direction -eq "Inbound")
+ if ($EndDate -eq $null)
  {
-  $Global:MailsReceived += $MailTraffic.MessageCount
+  $EndDate=Read-Host Enter End time for report generation '(Eg: 03/28/2022)'
  }
- else
+ Try
  {
-  $Global:MailsSent += $MailTraffic.MessageCount
- }
- $Print=0
-}
-
-function main{
-
-
- #Getting StartDate and EndDate for mail traffic collection
- if ((($StartDate -eq $null) -and ($EndDate -ne $null)) -or (($StartDate -ne $null) -and ($EndDate -eq $null)))
- {
-  Write-Host `nPlease enter both StartDate and EndDate for mail traffic data collection -ForegroundColor Red
-  exit
- }
- elseif(($StartDate -eq $null) -and ($EndDate -eq $null))
- {
-  $StartDate=(((Get-Date).AddDays(-90))).Date
-  $EndDate=Get-Date
- }
- else
- {
-  $StartDate=[DateTime]$StartDate
-  $EndDate=[DateTime]$EndDate
-  if($StartDate -lt ((Get-Date).AddDays(-90)))
-  {
-   Write-Host `nMail traffic data can be retrieved only for past 90 days. Please select a date after (Get-Date).AddDays(-90) -ForegroundColor Red
-   Exit
-  }
+  $Date=[DateTime]$EndDate
   if($EndDate -lt ($StartDate))
   {
-   Write-Host `nEnd time should be later than start time -ForegroundColor Red
-   Exit
+   Write-Host End time should be later than start time -ForegroundColor Red
+   return
   }
+  break
  }
-
- #Check for EXO v2 module inatallation
- $Module = Get-Module ExchangeOnlineManagement -ListAvailable
- if($Module.count -eq 0) 
- { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
-  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
-  if($Confirm -match "[yY]") 
-  { 
-   Write-host "Installing Exchange Online PowerShell module"
-   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
-  } 
-  else 
-  { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
-   Exit
-  }
- } 
-
- #Connect Exchange Online with MFA
- if($MFA.IsPresent)
+ Catch
  {
-  Connect-ExchangeOnline
+  Write-Host `nNot a valid date -ForegroundColor Red
  }
+}
 
- #Authentication using non-MFA
- else
- {
-  #Storing credential in script for scheduling purpose/ Passing credential as parameter
-  if(($UserName -ne "") -and ($Password -ne ""))
-  {
-   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
-   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-  }
-  else
-  {
-   $Credential=Get-Credential -Credential $null
-  }
-  Connect-ExchangeOnline -Credential $Credential
- }
+$IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
+[DateTime]$CurrentStart=$StartDate
+[DateTime]$CurrentEnd=$CurrentStart.AddMinutes(1439)
 
- #Connect to MsolService to get internal domains
- if($OnlyOrganizationUsers.IsPresent)
- {
-  #Connect MsolService
-  if($mfa.IsPresent)
-  {
-   Connect-MsolService
-  }
-  else
-  {
-   Connect-MsolService -Credential $Credential
-  }
-  $Domains=(Get-MsolDomain).Name
- }
 
- #Output file declaration
- $OutputCSV=".\Mail_Traffic_Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
- $AllMailTrafficData=@()
- $AllMailTraffic=""
- $AggregatedMailTrafficData=@()
- $Page=1
- Write-Host Getting mail traffic data...
+#Check whether CurrentEnd exceeds EndDate
+if($CurrentEnd -gt $EndDate)
+{
+ $CurrentEnd=$EndDate
+}
+
+if($CurrentStart -eq $CurrentEnd)
+{
+ Write-Host Start and end time are same.Please enter different time range -ForegroundColor Red
+ Exit
+}
+
+
+if($MailsSent.isPresent)
+{
+ $Category="TopMailSender"
+ $Header="Mails Sent"
+  #Filter to get sender mail traffic for organization's users alone
+  if($OnlyOrganizationUsers.IsPresent)
+  {
+   $Domains=(Get-MsolDomain).Name
+  }
+}
+
+elseif($SpamsReceived.IsPresent)
+{ 
+ $Category="TopSpamRecipient"
+ $Header="Spams Received"
+}
+elseif($MalwaresReceived.IsPresent)
+{
+ $Category="TopMalwareRecipient"
+ $Header="Malwares Received"
+}
+else
+{
+ $Category="TopMailRecipient"
+ $Header="Mails Received"
+}
+
+
+#Connect_Modules
+
+Write-Host Getting mail traffic data...
+
+#Output file declaration
+$OutputCSV=".\Mail_Traffic_Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
+$AllMailTrafficData=@()
+$AllMailTraffic=""
+$AggregatedMailTrafficData=@()
+$Page=1
+
+While($True)
+{
  Do
- {
-  $MailTrafficData=Get-MailTrafficTopReport -StartDate $StartDate -EndDate $EndDate -Page $Page -PageSize 5000 | Sort-Object Date,Name,Direction
+ { 
+  Write-Progress -Activity "`n     Retrieving mail traffic data for $CurrentStart"
+  $MailTrafficData=Get-MailTrafficSummaryReport -StartDate $CurrentStart -EndDate $CurrentEnd -Category $Category -Page $Page -PageSize 5000 | Select-Object C1,C2
   $AggregatedMailTrafficData+=$MailTrafficData
   $Page++
  }While($MailTrafficData.count -eq 5000)
-
- Write-Host The script has found $AggregatedMailTrafficData.count records
- Write-Host Processing Mail traffic data...
- $PreviousDate=$MailTrafficData[0].Date #FirstRecordDate
- $PreviousName=$MailTrafficData[0].Name #FirstRecordName
- $Global:MailsSent=0
- $Global:MailsReceived=0
- $Print=1
- $ProcessedRecords=0
- foreach($MailTraffic in $AggregatedMailTrafficData)
+ $Date=Get-Date($CurrentStart) -Format MM/dd/yyyy
+ $DataCount=$AggregatedMailTrafficData.count
+ for($i=0;$i -lt $DataCount ;$i++)
  {
-  $ProcessedRecords++
-  Write-Progress -Activity "`n     Processing Mail traffic data from $StartDate to $EndDate.."`n" Processed record count: $ProcessedRecords"
-  $CurrentDate=$MailTraffic.Date
-  $CurrentName=$MailTraffic.Name
-  $Count=$MailTraffic.MessageCount
-
-  #Filter to get mail traffic for organization's users alone
+  $UPN=$AggregatedMailTrafficData[$i].C1 
   if($OnlyOrganizationUsers.IsPresent)
   {
-   $Domain=$CurrentName.Split("@") | Select-Object -Index 1
+   $Domain=$UPN.Split("@") | Select-Object -Index 1
    if(($Domain -in $Domains) -eq $false)
    {
     continue
    }
   }
-  if($PreviousDate -eq $CurrentDate)
-  {
-   if($PreviousName -eq $CurrentName)
-   {
-    Get_MailCount -traffic $MailTraffic
-   }
-   else
-   {
-    #Export Output to CSV
-    Print_Output
-    $PreviousName=$CurrentName
-    $Global:MailsReceived=0
-    $Global:MailsSent=0
-    Get_MailCount -Traffic $MailTraffic
-   }
-  }
-  else
-  {
-   If($Print -eq 0)
-   {
-    #Export Output to CSV
-    Print_Output
-   }
-   $PreviousDate=$CurrentDate
-   $PreviousName=$CurrentName
-   $Global:MailsReceived=0
-   $Global:MailsSent=0
-   Get_MailCount -Traffic $MailTraffic
-  }
+  $Count=$AggregatedMailTrafficData[$i].C2
+  $AllMailTraffic=@{'Date'=$Date;'User Principal Name'=$UPN;$Header=$Count}
+  $AllMailTrafficData= New-Object PSObject -Property $AllMailTraffic
+  $AllMailTrafficData | select Date,'User Principal Name',$Header | Export-Csv $OutputCSV -NoTypeInformation -Append
  }
- #Export Output to CSV
- Print_Output
-
- If($ProcessedRecords -eq 0)
+ $AggregatedMailTrafficData=@()
+ $Page=1
+ if([datetime]$CurrentEnd -ge [datetime]$EndDate)
  {
-  Write-Host No records found
- }
- #Open output file after execution
- else
+  break
+ } 
+ $CurrentStart=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
+ $CurrentEnd=$CurrentEnd.AddMinutes($IntervalTimeInMinutes)
+ if($CurrentStart -gt (Get-Date))
  {
-  if((Test-Path -Path $OutputCSV) -eq "True")
-  {
-   Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
-   $Prompt = New-Object -ComObject wscript.shell
-   $UserInput = $Prompt.popup("Do you want to open output file?",`
- 0,"Open Output File",4)
-   If ($UserInput -eq 6)
-   {
-    Invoke-Item "$OutputCSV"
-   }
-  }
- }
+  break
+ }  
 }
 
->>>>>>> 7ae5b5e4a263bf3538319b019c122a461ca937f5
- . main
+#Disconnect Exchange Online session
+Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
+
+if((Test-Path -Path $OutputCSV) -eq "True") 
+ {
+  Write-Host `nThe Output file available in the current working directory with name: $OutputCSV -ForegroundColor Green
+  $Prompt = New-Object -ComObject wscript.shell   
+  $UserInput = $Prompt.popup("Do you want to open output file?",`   
+ 0,"Open Output File",4)   
+  If ($UserInput -eq 6)   
+  {   
+   Invoke-Item "$OutputCSV"   
+  } 
+ }
