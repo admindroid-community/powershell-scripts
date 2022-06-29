@@ -48,7 +48,7 @@ function Connect_Exo {
     Write-Host "ExchangeOnline PowerShell module is connected successfully"
 }
 function FullAccess {
-    $MB_FullAccess = $global:Mailbox | Get-MailboxPermission -User $UPN -ErrorAction Stop | Select-Object Identity
+    $MB_FullAccess = $global:Mailbox | Get-MailboxPermission -User $UPN -ErrorAction SilentlyContinue | Select-Object Identity
     if ($MB_FullAccess.count -ne 0) {
         $ExportResult = @{'User Name' = $Identity; 'AccessType' = "Full Access"; 'Delegated Mailbox Name' = $MB_FullAccess.Identity -join (",") }
     }
@@ -59,7 +59,7 @@ function FullAccess {
     $ExportResults | Select-object 'User Name', 'AccessType', 'Delegated Mailbox Name' | Export-csv -path $global:ExportCSVFileName -NoType -Append -Force
 }
 function SendAs {
-    $MB_SendAs = Get-RecipientPermission -Trustee $UPN -ErrorAction Stop | Select-Object Identity
+    $MB_SendAs = Get-RecipientPermission -Trustee $UPN -ErrorAction SilentlyContinue | Select-Object Identity
     if ($MB_SendAs.count -ne 0) {
         $ExportResult = @{'User Name' = $Identity; 'AccessType' = "Send As"; 'Delegated Mailbox Name' = $MB_SendAs.Identity -join (",") }
     }
@@ -71,7 +71,7 @@ function SendAs {
     
 }
 function SendOnBehalfTo {
-    $MB_SendOnBehalfTo = $global:Mailbox | Where-Object { $_.GrantSendOnBehalfTo -match $Identity } -ErrorAction Stop | Select-Object Name
+    $MB_SendOnBehalfTo = $global:Mailbox | Where-Object { $_.GrantSendOnBehalfTo -match $Identity } -ErrorAction SilentlyContinue | Select-Object Name
     if ($MB_SendOnBehalfTo.count -ne 0) {
         $ExportResult = @{'User Name' = $Identity; 'AccessType' = "Send on Behalf"; 'Delegated Mailbox Name' = $MB_SendOnBehalfTo.Name -join (",") }
     }
