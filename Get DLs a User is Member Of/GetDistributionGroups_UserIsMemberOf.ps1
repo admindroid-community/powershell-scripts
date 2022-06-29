@@ -56,14 +56,17 @@ Function Import_Csv
     {
         $UserDetails=@()
         Write-Host "Importing UserPrincipalNames from Csv..."
-        Import-Csv -LiteralPath $InputCsvFilePath|ForEach{
-        $UserPrincipalName=$_.UserPrincipalName
+        $UPNs=Import-Csv $InputCsvFilePath 
+        foreach ($UPN in $UPNs)
+        {
+        $UserPrincipalName=$UPN.User_Principal_Name
             Try
 	        {   
-		         Get-Mailbox -Identity $UserPrincipalName -ResultSize unlimited -ErrorAction Stop | ForEach{
+		         Get-Mailbox -Identity $UserPrincipalName -ErrorAction Stop |foreach{
                      List_DLs_That_User_Is_A_Member
-                 }   
+                   
 	        }
+}
 	        Catch
             {
 		        Write-Host "$UserPrincipalName is not a valid user"
@@ -110,6 +113,7 @@ Function OpenOutputCsv
     If((Test-Path $OutputCsv) -eq "True") 
     {			
         Write-Host "The Output file available in $OutputCsv" 
+        Write-Host `nThe output file contains $ProcessedUserCount users. -ForegroundColor Green
         $Prompt = New-Object -ComObject wscript.shell    
         $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"open output file",4)    
         If($UserInput -eq 6)    
@@ -119,7 +123,7 @@ Function OpenOutputCsv
     } 	
 }
 Connect_Exo
-$Global:ProcessedUserCount=0
+$Global:ProcessedUserCount=1
 $OutputCsv=".\ListDLs_UsersIsMemberOf_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv"
 If($UserPrincipalName -ne "")
 {  
@@ -140,7 +144,7 @@ Elseif($InputCsvFilePath -ne "")
     Import_Csv
 }
 Else
-{  
+{ 
     Get-Mailbox -ResultSize unlimited -RecipientTypeDetails UserMailbox | ForEach{
 	    List_DLs_That_User_Is_A_Member
     }
