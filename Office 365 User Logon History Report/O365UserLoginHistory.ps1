@@ -1,9 +1,16 @@
-﻿Param
+﻿<#
+=============================================================================================
+Name:           Office 365 User Login History Report
+Website:        o365reports.com
+Version:        3.0
+For detailed Script execution: https://o365reports.com/2019/12/23/export-office-365-users-logon-history-report/
+============================================================================================
+#>
+Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$Success,
     [switch]$Failed,
-    [switch]$MFA,
     [Nullable[DateTime]]$StartDate,
     [Nullable[DateTime]]$EndDate,
     [string]$UserName,
@@ -39,64 +46,36 @@ else
 }
 
 
-#Authentication using MFA 
-if($MFA.IsPresent) 
-{ 
- $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1) 
- If ($MFAExchangeModule -eq $null) 
+ #Check for EXO v2 module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
  { 
-  Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow  
-  Write-Host You can manually install module using below blog : `nhttps://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/ `nOR you can install module directly by entering "Y"`n 
-  $Confirm= Read-Host `nAre you sure you want to install module directly? [Y] Yes [N] No 
-  if($Confirm -match "[Y]") 
-  {  
-   Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application" 
+  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Import-Module ExchangeOnlineManagement
   } 
   else 
   { 
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/' 
-   Exit 
-  } 
-  $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No  
-  if($Confirmation -match "[yY]") 
-  { 
-   $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1) 
-   If ($MFAExchangeModule -eq $null) 
-   { 
-    Write-Host Exchange Online MFA module is not available -ForegroundColor red 
-    Exit 
-   } 
-  } 
-  else 
-  {  
-   Write-Host Exchange Online PowerShell Module is required 
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/' 
-   Exit 
-  }     
+   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Exit
+  }
  } 
-  
- #Importing Exchange MFA Module 
- . "$MFAExchangeModule" 
- Write-Host Enter credential in prompt to connect to Exchange Online 
- Connect-EXOPSSession -WarningAction SilentlyContinue  
-} 
-
-#Authentication using non-MFA 
-else 
-{ 
- #Storing credential in script for scheduling purpose/ Passing credential as parameter 
- if(($AdminName -ne "") -and ($Password -ne "")) 
- { 
-  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force 
-  $Credential  = New-Object System.Management.Automation.PSCredential $AdminName,$SecuredPassword 
- } 
- else 
- { 
-  $Credential=Get-Credential -Credential $null 
- }  
- $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue 
- Import-PSSession $Session -AllowClobber -WarningAction SilentlyContinue | Out-Null 
-} 
+ Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
+ if(($AdminName -ne "") -and ($Password -ne ""))
+ {
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $AdminName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential
+ }
+ else
+ {
+  Connect-ExchangeOnline
+ }
 
 $OutputCSV=".\AuditLog_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 $IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
