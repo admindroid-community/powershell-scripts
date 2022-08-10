@@ -1,4 +1,12 @@
-﻿#Accept input paramenters
+﻿<#
+=============================================================================================
+Name:           Export Mailbox Permission Report
+Website:        o365reports.com
+Version:        3.0
+For detailed Script execution: https://o365reports.com/2019/03/07/export-mailbox-permission-csv/
+============================================================================================
+#>
+#Accept input paramenters
 param(
 [switch]$FullAccess,
 [switch]$SendAs,
@@ -8,7 +16,7 @@ param(
 [string]$MBNamesFile,
 [string]$UserName,
 [string]$Password,
-[switch]$MFA
+[switch]$NoMFA
 )
 
 
@@ -135,70 +143,49 @@ function main{
  #Connect AzureAD and Exchange Online from PowerShell
  Get-PSSession | Remove-PSSession
 
- #Check for MSOnline module
- $Modules=Get-Module -Name MSOnline -ListAvailable 
- if($Modules.count -eq 0)
- {
-  Write-Host  Please install MSOnline module using below command: -ForegroundColor yellow 
-  Write-Host Install-Module MSOnline  
-  Exit
+ #Check for EXO v2 module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Import-Module ExchangeOnlineManagement
+  } 
+  else 
+  { 
+   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Exit
+  }
+ } 
+ #Check for Azure AD module
+ $Module = Get-Module MsOnline -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host MSOnline module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install the module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing MSOnline PowerShell module"
+   Install-Module MSOnline -Repository PSGallery -AllowClobber -Force
+   Import-Module MSOnline
+  } 
+  else 
+  { 
+   Write-Host MSOnline module is required to generate the report.Please install module using Install-Module MSOnline cmdlet. 
+   Exit
+  }
  }
- 
- #Authentication using MFA
- if($MFA.IsPresent)
- {
-  $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-  If ($MFAExchangeModule -eq $null)
-  {
-   Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow
-   
-   Write-Host You can install module using below blog : `nLink `nOR you can install module directly by entering "Y"`n
-   $Confirm= Read-Host Are you sure you want to install module directly? [Y] Yes [N] No
-   if($Confirm -match "[yY]")
-   {
-     Write-Host Yes
-     Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
-   }
-   else
-   {
-    Start-Process 'https://http://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-    Exit
-   }
-   $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
-   
-    if($Confirmation -match "[yY]")
-    {
-     $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-     If ($MFAExchangeModule -eq $null)
-     {
-      Write-Host Exchange Online MFA module is not available -ForegroundColor red
-      Exit
-     }
-    }
-    else
-    { 
-     Write-Host Exchange Online PowerShell Module is required
-     Start-Process 'https://http://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-     Exit
-    }    
-   }
- 
-  #Importing Exchange MFA Module
-  . "$MFAExchangeModule"
-  Write-Host Enter credential in prompt to connect to Exchange Online
-  Connect-EXOPSSession -WarningAction SilentlyContinue
-  Write-Host Connected to Exchange Online
-  Write-Host `nEnter credential in prompt to connect to MSOnline
-  #Importing MSOnline Module
-  Connect-MsolService | Out-Null
-  Write-Host Connected to MSOnline `n`nReport generation in progress...
- }
+
  #Authentication using non-MFA
- else
+ if($NoMFA.IsPresent)
  {
   #Storing credential in script for scheduling purpose/ Passing credential as parameter
   if(($UserName -ne "") -and ($Password -ne ""))
-  {
+  { 
    $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
    $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
   }
@@ -206,9 +193,18 @@ function main{
   {
    $Credential=Get-Credential -Credential $null
   }
-  Connect-MsolService -Credential $credential 
-  $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection
-  Import-PSSession $Session -CommandName Get-Mailbox,Get-MailboxPermission,Get-RecipientPermission -FormatTypeName * -AllowClobber | Out-Null
+  Write-Host "Connecting Azure AD..."
+  Connect-MsolService -Credential $Credential | Out-Null
+  Write-Host "Connecting Exchange Online PowerShell..."
+  Connect-ExchangeOnline -Credential $Credential
+ }
+ #Connect to Exchange Online and AzureAD module using MFA 
+ else
+ {
+  Write-Host "Connecting Exchange Online PowerShell..."
+  Connect-ExchangeOnline
+  Write-Host "Connecting Azure AD..."
+  Connect-MsolService | Out-Null
  }
 
  #Set output file
