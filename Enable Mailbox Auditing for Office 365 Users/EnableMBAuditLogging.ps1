@@ -1,88 +1,58 @@
 ﻿<# Purpose      : Enable mailbox audit logging for all Office 365 mailboxes
-   Last updated : Jan 20, 2020
+   Last updated : Oct 22, 2022
    Website      : https://O365reports.com
    For execution steps and usecases: https://o365reports.com/2020/01/21/enable-mailbox-auditing-in-office-365-powershell
 #>
+
 #Accept input paramenters 
 param( 
 [Parameter(Mandatory = $false)]
 [string]$UserName, 
 [string]$Password, 
-[ValidateSet('ApplyRecord','Copy','Create','FolderBind','HardDelete','MessageBind','Move','MoveToDeletedItem','RecordDelete','SendAs','SendOnBehalf','SoftDelete','Update','UpdateCalendarDelegation','UpdateFolderPermissions','UpdateInboxRules','MailboxLogin')]
-[string[]]$Operations=('ApplyRecord','Copy','Create','FolderBind','HardDelete','MessageBind','Move','MoveToDeletedItem','RecordDelete','SendAs','SendOnBehalf','SoftDelete','Update','UpdateCalendarDelegation','UpdateFolderPermissions','UpdateInboxRules','MailboxLogin'),
-[switch]$MFA 
+[ValidateSet('ApplyRecord','Copy','Create','FolderBind','HardDelete','MailItemsAccessed','MessageBind','Move','MoveToDeletedItems','RecordDelete','SearchQueryInitiated','Send','SendAs','SendOnBehalf','SoftDelete','Update','UpdateCalendarDelegation','UpdateComplianceTag','UpdateFolderPermissions','UpdateInboxRules','MailboxLogin')]
+[string[]]$Operations=('ApplyRecord','Copy','Create','FolderBind','HardDelete','MailItemAccessed','MessageBind','Move','MoveToDeletedItems','RecordDelete','SearchQueryInitiated','Send','SendAs','SendOnBehalf','SoftDelete','Update','UpdateCalendarDelegation','UpdateComplianceTag','UpdateFolderPermissions','UpdateInboxRules','MailboxLogin')
 ) 
- #Remove existing sessions
- Get-PSSession | Remove-PSSession 
 
- #Authentication using MFA 
- if($MFA.IsPresent) 
+Function Connect_Exo
+{
+ #Check for EXO v2 module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
  { 
-  $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1) 
-  If ($MFAExchangeModule -eq $null) 
+  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
   { 
-   Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow 
-   Write-Host You can install module using below blog: https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/ `n `nOR you can install module directly by entering "Y"`n 
-   $Confirm= Read-Host Are you sure you want to install module directly? [Y] Yes [N] No 
-   if($Confirm -match "[y]") 
-   { 
-    Write-Host Yes 
-    Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application" 
-   } 
-   else 
-   { 
-    Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/' 
-    Exit 
-   } 
-   $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No 
-    
-   if($Confirmation -match "[y]") 
-   { 
-    $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1) 
-    If ($MFAExchangeModule -eq $null) 
-    { 
-     Write-Host Exchange Online MFA module is not available -ForegroundColor red 
-     Exit 
-    } 
-   } 
-   else 
-   {  
-    Write-Host Exchange Online PowerShell Module is required 
-    Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/' 
-    Exit 
-   }     
-  } 
-  
-  #Importing Exchange MFA Module 
-  Write-Host `nConnecting to Exchange Online...
-  . "$MFAExchangeModule" 
-  Connect-EXOPSSession -WarningAction SilentlyContinue 
-  
- } 
-
- #Authentication using non-MFA 
- else 
- { 
-  #Storing credential in script for scheduling purpose/ Passing credential as parameter 
-  if(($UserName -ne "") -and ($Password -ne "")) 
-  { 
-   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force 
-   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Import-Module ExchangeOnlineManagement
   } 
   else 
   { 
-   $Credential=Get-Credential -Credential $null 
-  }  
-  $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection 
-  Write-Host `nConnecting to Exchange Online...
-  Import-PSSession $Session -AllowClobber -DisableNameChecking| Out-Null 
+   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Exit
+  }
  } 
+ Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
+ if(($UserName -ne "") -and ($Password -ne ""))
+ {
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential
+ }
+ else
+ {
+  Connect-ExchangeOnline
+ }
+}
+Connect_Exo 
  $MBCount=0
- $AuditAdmin="ApplyRecord","Copy","Create","FolderBind","HardDelete","MessageBind","Move","MoveToDeletedItem","RecordDelete","SendAs","SendOnBehalf","SoftDelete","Update","UpdateCalendarDelegation","UpdateFolderPermissions","UpdateInboxRules"
- $AuditDelegate ="ApplyRecord","Create","FolderBind","HardDelete","Move","MoveToDeletedItems","RecordDelete","SendAs","SendOnBehalf","SoftDelete","Update","UpdateFolderPermissions","UpdateInboxRules"
- $AuditOwner="ApplyRecord","Create","HardDelete","MailboxLogin","Move","MoveToDeletedItems","RecordDelete","SoftDelete","Update","UpdateCalendarDelegation","UpdateFolderPermissions","UpdateInboxRules"
+ $AuditAdmin="ApplyRecord","Copy","Create","FolderBind","HardDelete","MailItemsAccessed","Move","MoveToDeletedItems","RecordDelete","Send","SendAs","SendOnBehalf","SoftDelete","Update","UpdateCalendarDelegation","UpdateComplianceTag","UpdateFolderPermissions","UpdateInboxRules"
+ $AuditDelegate ="ApplyRecord","Create","FolderBind","HardDelete","MailItemsAccessed","Move","MoveToDeletedItems","RecordDelete","SendAs","SendOnBehalf","SoftDelete","Update","UpdateComplianceTag","UpdateFolderPermissions","UpdateInboxRules"
+ $AuditOwner="ApplyRecord","Create","HardDelete","MailItemsAccessed","MailboxLogin","Move","MoveToDeletedItems","RecordDelete","SearchQueryInitiated","Send","SoftDelete","Update","UpdateCalendarDelegation","UpdateComplianceTag","UpdateFolderPermissions","UpdateInboxRules"
  
-if($Operations.Length -eq 17)
+if($Operations.Length -eq 21)
 {
  $RequiredOperations=$Operations
  Get-Mailbox -ResultSize Unlimited | Select PrimarySmtpAddress,DisplayName | ForEach { 
