@@ -1,4 +1,14 @@
-﻿#Accept input parameter
+﻿<#
+=============================================================================================
+Name:           Export Dynamic Distribution Group Members Report
+Version:        2.0
+Website:        o365reports.com
+Script by:      O365Reports Team
+For detailed script execution:  https://o365reports.com/2019/03/23/export-dynamic-distribution-group-members-to-csv/
+============================================================================================
+#>
+
+#Accept input parameter
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -7,7 +17,7 @@ Param
     [int]$MinGroupMembersCount,
     [string]$UserName,
     [string]$Password,
-    [Switch]$MFA
+    [Switch]$NoMFA
 )
 
 #Get group members
@@ -59,6 +69,7 @@ Function Get_Members
    }
    #Get Counts by RecipientTypeDetail
    $RecipientTypeDetail=$Member.RecipientTypeDetails
+   $MemberEmail=$Member.PrimarySMTPAddress
    foreach($key in [object[]]$Recipienthash.Keys)
    {
     if(($RecipientTypeDetail -eq $key) -eq "true")
@@ -96,74 +107,61 @@ Function Print_Output
 {
  if($Print=1)
  {
-  $Result=@{'DisplayName'=$DisplayName;'PrimarySmtpAddress'=$EmailAddress;'Alias'=$Alias;'Manager'=$Manager;'GroupMembersCount'=$Members.Count; 'Members'=$Member;'MemberType'=$RecipientTypeDetail} 
+  $Result=@{'DisplayName'=$DisplayName;'PrimarySmtpAddress'=$EmailAddress;'Alias'=$Alias;'Manager'=$Manager;'GroupMembersCount'=$Members.Count; 'Members'=$Member; 'MemberEmail'= $MemberEmail; 'MemberType'=$RecipientTypeDetail} 
   $Results= New-Object PSObject -Property $Result 
-  $Results | Select-Object DisplayName,PrimarySmtpAddress,Alias,Manager,GroupMembersCount,Members,MemberType | Export-Csv -Path $ExportCSV -Notype -Append
+  $Results | Select-Object DisplayName,PrimarySmtpAddress,Alias,Manager,GroupMembersCount,Members,MemberEmail,MemberType | Export-Csv -Path $ExportCSV -Notype -Append
  }
 }
 
 Function main()
 {
- #Connect AzureAD and Exchange Online from PowerShell 
- Get-PSSession | Remove-PSSession 
 
  #Get a list of RecipientTypeDetail
  $RecipientTypeArray=Get-Content -Path .\RecipientTypeDetails.txt -ErrorAction Stop
 
- #Authentication using MFA
- if($MFA.IsPresent)
- {
-  $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-  If ($MFAExchangeModule -eq $null)
-  {
-   Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow
-   
-   Write-Host You can install module using below blog : `nLink `nOR you can install module directly by entering "Y"`n
-   $Confirm= Read-Host Are you sure you want to install module directly? [Y] Yes [N] No
-   if($Confirm -match "[yY]")
-   {
-     Write-Host Yes
-     Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
-   }
-   else
-   {
-    Start-Process 'https://http://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-    Exit
-   }
-   $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
-   
-    if($Confirmation -match "[yY]")
-    {
-     $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-     If ($MFAExchangeModule -eq $null)
-     {
-      Write-Host Exchange Online MFA module is not available -ForegroundColor red
-      Exit
-     }
-    }
-    else
-    { 
-     Write-Host Exchange Online PowerShell Module is required
-     Start-Process 'https:http://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-     Exit
-    }
-     
-   }
-  
-  #Importing Exchange MFA Module
-  . "$MFAExchangeModule"
-  Write-Host Enter credential in prompt to connect to Exchange Online
-  Connect-EXOPSSession -WarningAction SilentlyContinue
-  Write-Host Connected to Exchange Online
-  Write-Host `nReport generation in progress...
+ #Check for EXO v2 module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Import-Module ExchangeOnlineManagement
+  } 
+  else 
+  { 
+   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Exit
+  }
+ } 
+ #Check for Azure AD module
+ $Module = Get-Module MsOnline -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host MSOnline module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install the module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing MSOnline PowerShell module"
+   Install-Module MSOnline -Repository PSGallery -AllowClobber -Force
+   Import-Module MSOnline
+  } 
+  else 
+  { 
+   Write-Host MSOnline module is required to generate the report.Please install module using Install-Module MSOnline cmdlet. 
+   Exit
+  }
  }
 
  #Authentication using non-MFA
- else
+ if($NoMFA.IsPresent)
  {
   #Storing credential in script for scheduling purpose/ Passing credential as parameter
   if(($UserName -ne "") -and ($Password -ne ""))
-  {
+  { 
    $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
    $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
   }
@@ -171,18 +169,29 @@ Function main()
   {
    $Credential=Get-Credential -Credential $null
   }
-  Connect-MsolService -Credential $credential 
-  $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection
-  Import-PSSession $Session -CommandName Get-DynamicDistributionGroup,Get-Recipient -FormatTypeName * -AllowClobber | Out-Null
+  Write-Host "Connecting Azure AD..."
+  Connect-MsolService -Credential $Credential | Out-Null
+  Write-Host "Connecting Exchange Online PowerShell..."
+  Connect-ExchangeOnline -Credential $Credential
+ }
+ #Connect to Exchange Online and AzureAD module using MFA 
+ else
+ {
+  Write-Host "Connecting Exchange Online PowerShell..."
+  Connect-ExchangeOnline
+  Write-Host "Connecting Azure AD..."
+  Connect-MsolService | Out-Null
  }
 
-
-
-
-
-
-
- 
+ #Friendly DateTime conversion
+ if($friendlyTime.IsPresent)
+ {
+  If(((Get-Module -Name PowerShellHumanizer -ListAvailable).Count) -eq 0)
+  {
+   Write-Host Installing PowerShellHumanizer for Friendly DateTime conversion
+   Install-Module -Name PowerShellHumanizer
+  }
+ }
 
  #Set output file 
  $ExportCSV=".\DynamicDistributionGroup-DetailedMembersReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" #Detailed report
@@ -191,7 +200,7 @@ Function main()
  
  $Result=""  
  $Results=@() 
- $Count=0
+ $Count=1
 
  #Check for input file
  if ($GroupNamesFile -ne "") 
@@ -235,7 +244,8 @@ Function main()
  {
   Write-Host No DynamicDistributionGroup found
  }
+ Write-Host "For more Office 365 reports, do check AdminDroid Office 365 reporting tool." -ForegroundColor Cyan
  #Clean up session 
- Get-PSSession | Remove-PSSession
+ Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
 }
 . main
