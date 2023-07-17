@@ -2,6 +2,19 @@
 =============================================================================================
 Name:           Export Office 365 users' license report
 website:        o365reports.com
+
+~~~~~~~~~~~~~~~~~
+Script Highlights:
+~~~~~~~~~~~~~~~~~
+1. The script uses MS Graph PowerShell and installs MS Graph PowerShell SDK (if not installed already) upon your confirmation. 
+2. It can be executed with certificate-based authentication (CBA) too.
+3. Exports Office 365 user license report to CSV file.
+4. You can choose to either “export license report for all office 365 users” or pass an input file to get license report of specific users alone.
+5. License Name is shown with its friendly name  like ‘Office 365 Enterprise E3’ rather than ‘ENTERPRISEPACK’.
+6. The script can be executed with MFA enabled account too.
+7. The script gives 2 output files. One with the detailed report of O365 Licensed users another with the simple details.
+
+
 For detailed Script execution: https://o365reports.com/2018/12/14/export-office-365-user-license-report-powershell/
 ============================================================================================
 #>
@@ -16,20 +29,20 @@ Param
 )
 Function ConnectMgGraphModule 
 {
-    $MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable
-    if($MsGraphModule -eq $null)
+    $MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+    if($MsGraphBetaModule -eq $null)
     { 
-        Write-host "Important: Microsoft Graph PowerShell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-        $confirm = Read-Host Are you sure you want to install Microsoft graph module? [Y] Yes [N] No  
+        Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+        $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
         if($confirm -match "[yY]") 
         { 
-            Write-host "Installing Microsoft Graph PowerShell module..."
-            Install-Module Microsoft.Graph -Scope CurrentUser
-            Write-host "Microsoft Graph PowerShell module is installed in the machine successfully" -ForegroundColor Magenta 
+            Write-host "Installing Microsoft Graph Beta module..."
+            Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+            Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
         } 
         else
         { 
-            Write-host "Exiting. `nNote: Microsoft Graph PowerShell module must be available in your system to run the script" -ForegroundColor Red
+            Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
             Exit 
         } 
     }
@@ -51,7 +64,7 @@ Function ConnectMgGraphModule
             Exit
         }
     }
-    Write-Host "Microsoft Graph PowerShell module is connected successfully" -ForegroundColor Green
+    Write-Host "Microsoft Graph Beta PowerShell module is connected successfully" -ForegroundColor Green
 }
 
 Function Get_UsersLicenseInfo
@@ -65,19 +78,18 @@ Function Get_UsersLicenseInfo
         $Country="-"
     }
     Write-Progress -Activity "`n     Exported user count:$LicensedUserCount "`n"Currently Processing:$upn"
-    $SKUs = Get-MgUserLicenseDetail -UserId $UPN
+    $SKUs = Get-MgBetaUserLicenseDetail -UserId $UPN -ErrorAction SilentlyContinue
     $LicenseCount = $SKUs.count
     $count = 0
     foreach($Sku in $SKUs)  #License loop
     {
-        $EasyName = $FriendlyNameHash[$Sku.SkuPartNumber]
-        if(!($EasyName))
+        if($FriendlyNameHash[$Sku.SkuPartNumber])
         {
-            $NamePrint = $Sku.SkuPartNumber
+            $NamePrint = $FriendlyNameHash[$Sku.SkuPartNumber]
         }
         else
         {
-            $NamePrint = $EasyName
+            $NamePrint = $Sku.SkuPartNumber
         }
         #Get all services for current SKUId
         $Services = $Sku.ServicePlans
@@ -109,8 +121,15 @@ Function Get_UsersLicenseInfo
                 $flag = 1
             }
             #Convert ServiceName to friendly name
-            $ServiceFriendlyName = $ServiceArray|?{$_.Service_Plan_Name -eq $ServiceName}
-            $ServiceFriendlyName = $ServiceFriendlyName[0].ServiceFriendlyNames
+            $ServiceFriendlyName = $ServiceArray|Where-Object{$_.Service_Plan_Name -eq $ServiceName}
+            if($ServiceFriendlyName -ne $Null)
+            {
+                $ServiceFriendlyName = $ServiceFriendlyName[0].ServiceFriendlyNames
+            }
+            else
+            {
+                $ServiceFriendlyName = $ServiceName
+            }
             if($flag -eq 1)
             {
                 if($EnabledServiceCount -ne 1)
@@ -143,14 +162,19 @@ function CloseConnection
 Function main()
 {
     ConnectMgGraphModule
-    Select-MgProfile beta
+    Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh PowerShell window." -ForegroundColor Yellow
     #Set output file
     $ExportCSV = ".\DetailedO365UserLicenseReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
     $ExportSimpleCSV = ".\SimpleO365UserLicenseReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
     #FriendlyName list for license plan and service
     try{
-        $FriendlyNameHash = Get-Content -Raw -Path .\LicenseFriendlyName.txt -ErrorAction SilentlyContinue | ConvertFrom-StringData
-        $ServiceArray =  Import-Csv -Path .\ServiceFriendlyName.csv -ErrorAction SilentlyContinue 
+        $FriendlyNameHash = Get-Content -Raw -Path .\LicenseFriendlyName.txt -ErrorAction SilentlyContinue -ErrorVariable ERR | ConvertFrom-StringData
+        if($ERR -ne $null)
+        {
+            Write-Host $ERR -ForegroundColor Red
+            CloseConnection
+        }
+        $ServiceArray =  Import-Csv -Path .\ServiceFriendlyName.csv 
     }
     catch
     {
@@ -167,24 +191,24 @@ Function main()
         $UserNames = Import-Csv -Header "UserPrincipalName" $UserNamesFile
         foreach($item in $UserNames)
         {
-            Get-MgUser -UserId $item.UserPrincipalName |where{$_.AssignedLicenses -ne $null} | Foreach{
-            Get_UsersLicenseInfo
-            $LicensedUserCount++
+            Get-MgBetaUser -UserId $item.UserPrincipalName -ErrorAction SilentlyContinue |Where-Object{$_.AssignedLicenses -ne $null} | ForEach-Object{
+                Get_UsersLicenseInfo
+                $LicensedUserCount++
             }
         }
     }
     #Get all licensed users
     else
     {
-        Get-MgUser -All | where{$_.AssignedLicenses -ne $null} | Foreach{
-        Get_UsersLicenseInfo
-        $LicensedUserCount++}
+        Get-MgBetaUser -All  |Where-Object{$_.AssignedLicenses -ne $null} | ForEach-Object{
+            Get_UsersLicenseInfo
+            $LicensedUserCount++
+        }
     }
     #Open output file after execution
     if((Test-Path -Path $ExportCSV) -eq "True") 
-    {
-        Write-Host Detailed report available in: $ExportCSV
-        Write-host Simple report available in: $ExportSimpleCSV
+    {   Write-Host `n "Detailed report available in:" -NoNewline -ForegroundColor Yellow; Write-Host "$ExportCSV" 
+        Write-Host `n "Simple report available in:" -NoNewline -ForegroundColor Yellow; Write-Host "$ExportSimpleCSV" `n 
         $Prompt = New-Object -ComObject wscript.shell
         $UserInput = $Prompt.popup("Do you want to open output files?",` 0,"Open Files",4)
         if($UserInput -eq 6)
@@ -195,8 +219,10 @@ Function main()
     }
     else
     {
-        Write-Host "No data found" -ForegroundColor Red
+        Write-Host "No data found" 
     }
+    Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
     CloseConnection
 }
  . main
