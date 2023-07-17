@@ -1,12 +1,24 @@
 ﻿<#
 =============================================================================================
-Name:           Get Azure AD Devices Report Using PowerShell
-Description:    This script gives detailed information on all Azure AD devices
-Version:        1.0
-Website:        o365reports.com
+Name:           Export Azure Device Report using MS Graph PowerShell
+Description:    This script exports Microsoft 365 Azure AD devices to CSV
+Version:        2.0
+website:        o365reports.com
+
+
+Script Highlights 
+1.The script can be executed with MFA-enabled accounts too. 
+2.Exports output to CSV. 
+3.Automatically installs the Microsoft Graph PowerShell module in your PowerShell environment upon your confirmation. 
+4.Supports the method of certificate-based authentication. 
+5.The script lists all the Azure AD devices of your organization. That too customization of reports is possible according to the major device types like managed, enabled, disabled etc. 
+
 For detailed script execution: https://o365reports.com/2023/04/18/get-azure-ad-devices-report-using-powershell/
-============================================================================================
 #>
+
+
+
+
 ## If you execute via CBA, then your application required "Directory.Read.All" application permissions.
 Param
 (
@@ -20,20 +32,20 @@ Param
     [switch]$ManagedDevice,
     [switch]$DevicesWithBitLockerKey
 )
-$MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable
-if($MsGraphModule -eq $null)
+$MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+if($MsGraphBetaModule -eq $null)
 { 
-    Write-host "Important: Microsoft Graph Powershell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-    $confirm = Read-Host Are you sure you want to install Microsoft Graph Powershell module? [Y] Yes [N] No  
+    Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
     if($confirm -match "[yY]") 
     { 
-        Write-host "Installing Microsoft Graph Powershell module..."
-        Install-Module Microsoft.Graph -Scope CurrentUser
-        Write-host "Microsoft Graph Powershell module is installed in the machine successfully" -ForegroundColor Magenta 
+        Write-host "Installing Microsoft Graph Beta module..."
+        Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+        Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
     } 
     else
     { 
-        Write-host "Exiting. `nNote: Microsoft Graph Powershell module must be available in your system to run the script" -ForegroundColor Red
+        Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
         Exit 
     } 
 }
@@ -57,8 +69,8 @@ else
         Exit
     }
 }
-Write-Host "Microsoft Graph Powershell module is connected successfully" -ForegroundColor Green
-Select-MgProfile beta
+Write-Host "Microsoft Graph Beta Powershell module is connected successfully" -ForegroundColor Green
+Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh Powershell window."
 function CloseConnection
 {
     Disconnect-MgGraph |  Out-Null
@@ -67,7 +79,7 @@ function CloseConnection
 $OutputCsv =".\AzureDeviceReport_$((Get-Date -format MMM-dd` hh-mm-ss` tt).ToString()).csv" 
 $Report=""
 $FilterCondition = @()
-$DeviceInfo = Get-MgDevice -All
+$DeviceInfo = Get-MgBetaDevice -All
 if($DeviceInfo -eq $null)
 {
     Write-Host "You have no devices enrolled in your Azure AD" -ForegroundColor Red
@@ -97,7 +109,7 @@ Foreach($Device in $DeviceInfo){
     {
         $BitLockerKeyIsPresent = "No"
         try {
-            $BitLockerKeys = Get-MgInformationProtectionBitlockerRecoveryKey -Filter "DeviceId eq '$($Device.DeviceId)'" -ErrorAction SilentlyContinue -ErrorVariable Err
+            $BitLockerKeys = Get-MgBetaInformationProtectionBitlockerRecoveryKey -Filter "DeviceId eq '$($Device.DeviceId)'" -ErrorAction SilentlyContinue -ErrorVariable Err
             if($Err -ne $null)
             {
                 Write-Host $Err -ForegroundColor Red
@@ -132,9 +144,9 @@ Foreach($Device in $DeviceInfo){
             continue
         }
     }
-    $DeviceOwners = Get-MgDeviceRegisteredOwner -DeviceId $Device.Id -All |Select-Object -ExpandProperty AdditionalProperties
-    $DeviceUsers = Get-MgDeviceRegisteredUser -DeviceId $Device.Id -All |Select-Object -ExpandProperty AdditionalProperties
-    $DeviceMemberOf = Get-MgDeviceMemberOf -DeviceId $Device.Id -All |Select-Object -ExpandProperty AdditionalProperties
+    $DeviceOwners = Get-MgBetaDeviceRegisteredOwner -DeviceId $Device.Id -All |Select-Object -ExpandProperty AdditionalProperties
+    $DeviceUsers = Get-MgBetaDeviceRegisteredUser -DeviceId $Device.Id -All |Select-Object -ExpandProperty AdditionalProperties
+    $DeviceMemberOf = Get-MgBetaDeviceMemberOf -DeviceId $Device.Id -All |Select-Object -ExpandProperty AdditionalProperties
     $Groups = $DeviceMemberOf|Where-Object {$_.'@odata.type' -eq '#microsoft.graph.group'}
     $AdministrativeUnits = $DeviceMemberOf|Where-Object{$_.'@odata.type' -eq '#microsoft.graph.administrativeUnit'}
     if($Device.TrustType -eq "Workplace")
@@ -203,17 +215,20 @@ Foreach($Device in $DeviceInfo){
 }
 if((Test-Path -Path $OutputCsv) -eq "True") 
 { 
-    Write-Host "The Output file availble in $outputCsv" -ForegroundColor Green 
+     Write-Host `n "The Output file availble in:" -NoNewline -ForegroundColor Yellow; Write-Host "$outputCsv" `n 
     $prompt = New-Object -ComObject wscript.shell    
     $UserInput = $prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)    
     if ($UserInput -eq 6)    
     {    
         Invoke-Item "$OutputCsv"  
-        Write-Host "Report generated successfully"  -ForegroundColor Green 
+        Write-Host "Report generated successfully"  
     }
 } 
 else
 {
-    Write-Host "No devices found" -ForegroundColor Red
+    Write-Host "No devices found"
 }
+
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
 CloseConnection
