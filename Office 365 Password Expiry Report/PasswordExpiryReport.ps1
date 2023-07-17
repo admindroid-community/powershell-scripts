@@ -3,7 +3,18 @@
 Name:           Export Office 365 Users’ Last Password Change Date using MS Graph
 website:        o365reports.com
 Script by:      O365Reports Team
-Version:        4.0
+Version:        5.0
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+#. A single script allows you to generate 7 different password reports. 
+#. The script uses MS Graph PowerShell and installs MS Graph PowerShell SDK (if not installed already) upon your confirmation. 
+#. It can be executed with certificate-based authentication (CBA) too.
+#. The script can be executed with MFA enabled accounts too 
+#. Exports output to CSV 
+#. You can filter result to display Licensed users alone 
+#. The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
 For detailed Script execution: https://o365reports.com/2020/02/17/export-office-365-users-last-password-change-date-to-csv
 ============================================================================================
 #>
@@ -21,20 +32,20 @@ Param
     [string]$CertificateThumbprint
 ) 
 
-$MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable
-if($MsGraphModule -eq $null)
+$MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+if($MsGraphBetaModule -eq $null)
 { 
-    Write-host "Important: Microsoft graph module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-    $confirm = Read-Host Are you sure you want to install Microsoft graph module? [Y] Yes [N] No  
+    Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
     if($confirm -match "[yY]") 
     { 
-        Write-host "Installing Microsoft graph module..."
-        Install-Module Microsoft.Graph -Scope CurrentUser
-        Write-host "Microsoft graph module is installed in the machine successfully" -ForegroundColor Magenta 
+        Write-host "Installing Microsoft Graph Beta module..."
+        Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+        Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
     } 
     else
     { 
-        Write-host "Exiting. `nNote: Microsoft graph module must be available in your system to run the script" -ForegroundColor Red
+        Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
         Exit 
     } 
 }
@@ -56,8 +67,8 @@ else
         Exit
     }
 }
-Write-Host "Microsoft Graph Powershell module is connected successfully" -ForegroundColor Green
-Select-MgProfile beta
+Write-Host "Microsoft Graph Beta Powershell module is connected successfully" -ForegroundColor Green
+Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh Powershell window." -ForegroundColor Yellow
 
 $UserCount = 0 
 $PrintedUser = 0 
@@ -67,7 +78,7 @@ $PwdPolicy=@{}
 $ExportCSV = ".\PasswordExpiryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 
 #Getting Password policy for the domain
-$Domains = Get-MgDomain   #-Status Verified
+$Domains = Get-MgBetaDomain   #-Status Verified
 foreach($Domain in $Domains)
 { 
     #Check for federated domain
@@ -87,7 +98,7 @@ foreach($Domain in $Domains)
 }
 Write-Host Generating report... -ForegroundColor Magenta
 #Loop through each user 
-Get-MgUser -All -Property DisplayName,UserPrincipalName,LastPasswordChangeDateTime,PasswordPolicies,AssignedLicenses,AccountEnabled | foreach{ 
+Get-MgBetaUser -All -Property DisplayName,UserPrincipalName,LastPasswordChangeDateTime,PasswordPolicies,AssignedLicenses,AccountEnabled | foreach{ 
     $UPN = $_.UserPrincipalName
     $DisplayName = $_.DisplayName
     [boolean]$Federated = $false
@@ -218,7 +229,8 @@ else
     Write-Host  $PrintedUser users. -ForegroundColor Green
     if((Test-Path -Path $ExportCSV) -eq "True") 
     {
-        Write-Host `nThe Output file available in $ExportCSV -ForegroundColor Green
+        Write-Host `n "The Output file availble in:" -NoNewline -ForegroundColor Yellow; Write-Host "$ExportCSV" `n 
+   
         $Prompt = New-Object -ComObject wscript.shell   
         $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)   
         if ($UserInput -eq 6)   
@@ -227,4 +239,7 @@ else
         } 
     }
 }
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+
 Disconnect-MgGraph | Out-Null
