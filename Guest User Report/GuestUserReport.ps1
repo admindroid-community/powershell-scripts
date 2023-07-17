@@ -3,6 +3,18 @@
 Name:           Export Office 365 Guest user and their membership report using MS Graph PowerShell
 Version:        3.0
 Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+#. The script uses MS Graph PowerShell and installs MS Graph PowerShell SDK (if not installed already) upon your confirmation. 
+#. It can be executed with certificate-based authentication (CBA) too.
+#. The script can be executed with MFA enabled account too. 
+#. Exports report results as a CSV file. 
+#. Allows to use filter to get stale guest accounts. 
+#. Allows to use filter to get recently created guest users. 
+#. The script is scheduler friendly. 
+
+
 For detailed Script execution: https://o365reports.com/2020/11/12/export-office-365-guest-user-report-with-their-membership/
 ============================================================================================
 #>
@@ -17,20 +29,20 @@ Param
     [string]$CertificateThumbprint
 )
 
-$MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable
-if($MsGraphModule -eq $null)
+$MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+if($MsGraphBetaModule -eq $null)
 { 
-    Write-host "Important: Microsoft graph module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-    $confirm = Read-Host Are you sure you want to install Microsoft graph module? [Y] Yes [N] No  
+    Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
     if($confirm -match "[yY]") 
     { 
-        Write-host "Installing Microsoft graph module..."
-        Install-Module Microsoft.Graph -Scope CurrentUser
-        Write-host "Microsoft graph module is installed in the machine successfully" -ForegroundColor Magenta 
+        Write-host "Installing Microsoft Graph Beta module..."
+        Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+        Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
     } 
     else
     { 
-        Write-host "Exiting. `nNote: Microsoft graph module must be available in your system to run the script" -ForegroundColor Red
+        Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
         Exit 
     } 
 }
@@ -52,8 +64,8 @@ else
         Exit
     }
 }
-Write-Host "Microsoft Graph Powershell module is connected successfully" -ForegroundColor Green
-Select-MgProfile beta
+Write-Host "Microsoft Graph Beta Powershell module is connected successfully" -ForegroundColor Green
+Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh Powershell window." -ForegroundColor Yellow
 $Result=""   
 $GuestCount=0
 $PrintedGuests=0
@@ -62,7 +74,7 @@ $PrintedGuests=0
 $ExportCSV=".\GuestUserReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm-ss` tt).ToString()).csv"
 Write-Host `nExporting report... 
 #Getting guest users
-Get-MgUser -All -Filter "UserType eq 'Guest'" -ExpandProperty MemberOf  | foreach {
+Get-MgBetaUser -All -Filter "UserType eq 'Guest'" -ExpandProperty MemberOf  | foreach {
     $DisplayName = $_.DisplayName
     $GuestCount++
     Write-Progress -Activity "`n     Processed mailbox count: $GuestCount "`n"  Currently Processing: $DisplayName"
@@ -99,7 +111,8 @@ Get-MgUser -All -Filter "UserType eq 'Guest'" -ExpandProperty MemberOf  | foreac
 Write-Host `nScript executed successfully
 if((Test-Path -Path $ExportCSV) -eq "True")
 {
-    Write-Host "Detailed report available in: $ExportCSV" -ForegroundColor Green
+   
+    Write-Host `n "The Output file availble in:" -NoNewline -ForegroundColor Yellow; Write-Host "$ExportCSV" `n 
     Write-Host `nThe Output file contains $PrintedGuests guest users.
     $Prompt = New-Object -ComObject wscript.shell  
     $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)  
@@ -110,6 +123,9 @@ if((Test-Path -Path $ExportCSV) -eq "True")
 }
 else
 {
-    Write-Host "No guest user found" -ForegroundColor Red
+    Write-Host "No guest user found"
 }
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+
 Disconnect-MgGraph|Out-Null
