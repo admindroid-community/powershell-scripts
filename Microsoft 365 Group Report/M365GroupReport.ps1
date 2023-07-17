@@ -1,8 +1,8 @@
 ﻿<#
 =============================================================================================
 Name:           Microsoft 365 Group Report
-Description:    This script exports Microsoft 365 groups and their membership to CSV
-Version:        1.0
+Description:    This script exports Microsoft 365 groups and their membership to CSV using Microsoft Graph PowerShell
+Version:        3.0
 website:        o365reports.com
 Script by:      O365Reports Team
 For detailed Script execution: https://o365reports.com/2021/02/11/export-microsoft-365-group-report-to-csv-using-powershell
@@ -182,8 +182,7 @@ Function main()
         } 
     } 
     Write-Host "Connecting to Microsoft Graph..." 
-    $Scopes = @(
-        "Group.Read.All"
+    $Scopes = @("Directory.Read.All"
     )  
     #Storing credential in script for scheduling purpose/ Passing credential as parameter
     $Error.Clear()  
