@@ -4,7 +4,19 @@ Name:           Export Microsoft 365 Admin Report using MS Graph PowerShell
 Description:    This script exports Microsoft 365 admin role group membership to CSV
 Version:        3.0
 website:        o365reports.com
-Script by:      O365Reports Team
+
+
+Script Highlights: 
+The script uses MS Graph PowerShell and installs MS Graph PowerShell SDK-beta (if not installed already) upon your confirmation. 
+It supports MFA-enabled admin accounts too.
+It can be executed with certificate-based authentication (CBA) too.
+With a simple execution format, you can achieve all admins’ report and role-based admin report.
+Helps to find admin roles for a specific user(s).
+Helps to get all admins with a specific role(s).
+The script is scheduler-friendly. 
+Exports the result to file in the CSV format and also opens the CSV on confirmation.
+
+
 For detailed Script execution: https://o365reports.com/2021/03/02/Export-Office-365-admin-role-report-powershell
 ============================================================================================
 #>
@@ -19,20 +31,20 @@ param (
 )
    
 #Check for module availability
-$MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable
-if($MsGraphModule -eq $null)
+$MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+if($MsGraphBetaModule -eq $null)
 { 
-    Write-host "Important: Microsoft graph module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-    $confirm = Read-Host Are you sure you want to install Microsoft graph module? [Y] Yes [N] No  
+    Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
     if($confirm -match "[yY]") 
     { 
-        Write-host "Installing Microsoft graph module..."
-        Install-Module Microsoft.Graph -Scope CurrentUser
-        Write-host "Microsoft graph module is installed in the machine successfully" -ForegroundColor Magenta 
+        Write-host "Installing Microsoft Graph Beta module..."
+        Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+        Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
     } 
     else
     { 
-        Write-host "Exiting. `nNote: Microsoft graph module must be available in your system to run the script" -ForegroundColor Red
+        Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
         Exit 
     } 
 }
@@ -54,15 +66,15 @@ else
         Exit
     }
 }
-Write-Host "Microsoft Graph Powershell module is connected successfully" -ForegroundColor Green
-Select-MgProfile beta
-Write-Host "Preparing admin report..." 
+Write-Host "Microsoft Graph Beta Powershell module is connected successfully" -ForegroundColor Green
+Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh Powershell window." -ForegroundColor Yellow
+Write-Host "`nPreparing admin report..." 
 $Admins=@() 
 $RoleList = @() 
 $OutputCsv=".\AdminReport_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv" 
 function Process_AdminReport
 { 
-    $AdminMemberOf=Get-MgUserMemberOf -UserId $Admins.Id |Select-Object -ExpandProperty AdditionalProperties
+    $AdminMemberOf=Get-MgBetaUserTransitiveMemberOf -UserId $Admins.Id |Select-Object -ExpandProperty AdditionalProperties
     $AssignedRoles=$AdminMemberOf|?{$_.'@odata.type' -eq '#microsoft.graph.directoryRole'} 
     $DisplayName=$Admins.DisplayName
     if($Admins.AssignedLicenses -ne $null)
@@ -91,7 +103,7 @@ function Process_AdminReport
 } 
 function Process_RoleBasedAdminReport
 { 
-    $AdminList = Get-MgDirectoryRoleMember -DirectoryRoleId $AdminRoles.Id |Select-Object -ExpandProperty AdditionalProperties
+    $AdminList = Get-MgBetaDirectoryRoleMember -DirectoryRoleId $AdminRoles.Id |Select-Object -ExpandProperty AdditionalProperties
     $RoleName=$AdminRoles.DisplayName
     if($ExcludeGroups.IsPresent)
     {
@@ -114,7 +126,7 @@ function Process_RoleBasedAdminReport
 #Check to generate role based admin report
 if($RoleBasedAdminReport.IsPresent)
 { 
-    Get-MgDirectoryRole -All| ForEach-Object { 
+    Get-MgBetaDirectoryRole -All| ForEach-Object { 
     $AdminRoles= $_ 
     Process_RoleBasedAdminReport 
     } 
@@ -126,7 +138,7 @@ elseif($AdminName -ne "")
     $AllUPNs = $AdminName.Split(",")
     ForEach($Admin in $AllUPNs) 
     { 
-        $Admins=Get-MgUser -UserId $Admin -ErrorAction SilentlyContinue 
+        $Admins=Get-MgBetaUser -UserId $Admin -ErrorAction SilentlyContinue 
         if($Admins -eq $null)
         { 
             Write-host "$Admin is not available. Please check the input" -ForegroundColor Red 
@@ -144,7 +156,7 @@ elseif($RoleName -ne "")
     $RoleNames = $RoleName.Split(",")
     ForEach($Name in $RoleNames) 
     { 
-        $AdminRoles= Get-MgDirectoryRole -Filter "DisplayName eq '$Name'" -ErrorAction SilentlyContinue 
+        $AdminRoles= Get-MgBetaDirectoryRole -Filter "DisplayName eq '$Name'" -ErrorAction SilentlyContinue 
         if($AdminRoles -eq $null)
         { 
             Write-Host "$Name role is not available. Please check the input" -ForegroundColor Red 
@@ -159,7 +171,7 @@ elseif($RoleName -ne "")
 #Generating all admins report
 else
 { 
-    Get-MgUser -All | ForEach-Object { 
+    Get-MgBetaUser -All | ForEach-Object { 
     $Admins= $_ 
     Process_AdminReport 
     } 
@@ -168,17 +180,20 @@ else
 #Open output file after execution 
 if((Test-Path -Path $OutputCsv) -eq "True") 
 { 
-    Write-Host "The Output file availble in $outputCsv" -ForegroundColor Green 
+    Write-Host `n "The Output file availble in:" -NoNewline -ForegroundColor Yellow; Write-Host "$outputCsv" `n 
     $prompt = New-Object -ComObject wscript.shell    
     $UserInput = $prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)    
     If ($UserInput -eq 6)    
     {    
         Invoke-Item "$OutputCsv"  
-        Write-Host "Report generated  successfuly"  -ForegroundColor Green 
+        Write-Host "Report generated  successfuly"
     }
 } 
 else
 {
     Write-Host "No data found" -ForegroundColor Red
 }
+
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
 Disconnect-MgGraph|Out-Null
