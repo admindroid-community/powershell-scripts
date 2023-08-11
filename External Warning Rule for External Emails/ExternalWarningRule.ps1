@@ -1,72 +1,62 @@
-﻿#Create mail flow rule for adding External warning message for external mails
+﻿<#
+=============================================================================================
+Name:           Configure External Email Warning Message for External Office 365 Emails
+Version:        3.0
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~~
+
+1.This script can be executed with MFA enabled account too. 
+2.Prepends “External” to subject line for incoming external emails 
+3.Adds “External Disclaimer” for external emails 
+4.You can exclude group mailboxes like support, sales that facing external world. 
+
+For detailed script execution:  https://o365reports.com/2020/03/25/how-to-add-external-email-warning-message/
+============================================================================================
+#>
+
+#Create mail flow rule for adding External warning message for external mails
 Param
 (
     [Parameter(Mandatory = $false)]
-    [switch]$MFA,
     [string]$ExcludeGroupMembers,
     [string]$ExcludeMB,
     [string]$UserName,
     [string]$Password
 )
-Get-PSSession | Remove-PSSession
-#Authentication using MFA
-if($MFA.IsPresent)
-{
- $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
- If ($MFAExchangeModule -eq $null)
- {
-  Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow
-  Write-Host You can manually install module using below blog : `nhttps://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/ `nOR you can install module directly by entering "Y"`n
-  $Confirm= Read-Host `nAre you sure you want to install module directly? [Y] Yes [N] No
-  if($Confirm -match "[Y]")
-  {
-   Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
-  }
-  else
-  {
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
+
+#Check for EXO module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host Exchange Online PowerShell module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Import-Module ExchangeOnlineManagement
+  } 
+  else 
+  { 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
-  $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
-  if($Confirmation -match "[yY]")
-  {
-   $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-   If ($MFAExchangeModule -eq $null)
-   {
-    Write-Host Exchange Online MFA module is not available -ForegroundColor red
-    Exit
-   }
-  }
-  else
-  {
-   Write-Host Exchange Online PowerShell Module is required
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-   Exit
-  }
- }
-
- #Importing Exchange MFA Module
- . "$MFAExchangeModule"
- Write-Host Enter credential in prompt to connect to Exchange Online
- Connect-EXOPSSession -WarningAction SilentlyContinue
-}
-
-#Authentication using non-MFA
-else
-{
- #Storing credential in script for scheduling purpose/ Passing credential as parameter
+ } 
+ Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
  if(($UserName -ne "") -and ($Password -ne ""))
  {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential
  }
  else
  {
-  $Credential=Get-Credential -Credential $null
+  Connect-ExchangeOnline
  }
- $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
- Import-PSSession $Session -AllowClobber -DisableNameChecking | Out-Null
-}
+
 $Disclaimer='<p><div style="background-color:#FFEB9C; width:100%; border-style: solid; border-color:#9C6500; border-width:1pt; padding:2pt; font-size:10pt; line-height:12pt; font-family:Calibri; color:Black; text-align: left;"><span style="color:#9C6500"; font-weight:bold;>CAUTION:</span> This email originated from outside of the organization. Do not click links or open attachments unless you recognize the sender and know the content is safe.</div><br></p>'
 $ExcludeGroups=@()
 $ExcludeMBs=@()
@@ -104,9 +94,12 @@ elseif($ExcludeMB -ne "")
  }
  Write-Host `nCreating mail flow rule for External Senders... -ForegroundColor Yellow
  New-TransportRule "External Email Warning" -FromScope NotInOrganization -SentToScope InOrganization -PrependSubject [EXTERNAL]: -Priority 0 -ApplyHtmlDisclaimerText $Disclaimer -ExceptIfAnyOfToCCHeader $ExcludeMBs -ApplyHtmlDisclaimerLocation Prepend -ApplyHtmlDisclaimerFallbackAction Wrap
-}
+ }
 else
 {
 Write-Host Creating mail flow rule for External Senders... -ForegroundColor Yellow
 New-TransportRule "External Email Warning" -FromScope NotInOrganization -SentToScope InOrganization -PrependSubject [EXTERNAL]: -Priority 0 -ApplyHtmlDisclaimerText $Disclaimer -ApplyHtmlDisclaimerLocation Prepend -ApplyHtmlDisclaimerFallbackAction Wrap
 }
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+Disconnect-ExchangeOnline
