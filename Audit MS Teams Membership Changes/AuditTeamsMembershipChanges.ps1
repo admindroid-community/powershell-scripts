@@ -1,4 +1,24 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           Audit Microsoft Teams membership changes in Office 365
+Version:        1.0
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to retrieve audit logs.    
+2.The script can be executed with an MFA enabled account too.      
+3.Exports report results to CSV file.    
+4.Exports all the teams’ membership changes 
+5.The script has a filter to track private channel membership changes. 
+6.The script has a filter to monitor shared channel membership changes. 
+7.Allows you to generate an audit report for a custom period.   
+8.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.  
+9.The script is scheduler friendly. I.e., Credentials can be passed as a parameter instead of saved inside the script. 
+
+For detailed script execution: https://o365reports.com/2022/12/13/audit-microsoft-teams-membership-changes-using-powershell
+============================================================================================
+#>
 
 Param
 (
@@ -262,7 +282,7 @@ else
  Write-Host `nThe output file contains $OutputEvents audit records
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
+  Write-Host `n "The Output file available in:" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCSV"
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -270,15 +290,9 @@ else
   {   
    Invoke-Item "$OutputCSV"   
   } 
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
  }
 }
-Write-Host `nCheck out """AdminDroid Microsoft 365 Reporting tool""" to get access to 1660+ Microsoft 365 reports.`n -ForegroundColor Cyan
 #Disconnect Exchange Online session
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-
-<#
-=============================================================================================
-Name: Audit Microsoft Teams membership changes in Office 365
-For detailed script execution: https://o365reports.com/2022/12/13/audit-microsoft-teams-membership-changes-using-powershell
-============================================================================================
-#>
