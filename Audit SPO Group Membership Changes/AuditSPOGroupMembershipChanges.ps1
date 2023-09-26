@@ -2,9 +2,22 @@
 =============================================================================================
 Name:           Audit SharePoint Online group membership changes report
 Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to connect to Exchange Online.   
+2.The script can be executed with an MFA-enabled account too.   
+3.Exports report results to CSV file.   
+4.Helps to identify newly added and removed guest accounts separately. 
+5.Allows you to generate an SPO group membership audit report for a custom period.   
+6.Allows you to audit the group permission changes based on the workload, such as SharePoint and OneDrive. 
+7.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.  
+8.The script is scheduler-friendly. I.e., Credentials can be passed as a parameter instead of getting interactively.
+
 For detailed script execution:  https://o365reports.com/2022/06/22/audit-sharepoint-online-group-membership-changes-using-powershell
 ============================================================================================
 #>
+
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -243,14 +256,16 @@ else
  Write-Host `nThe output file contains $OutputEvents audit records
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
+  Write-Host `n "The Output file available in:" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCSV"`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
   If ($UserInput -eq 6)   
   {   
-   Invoke-Item "$OutputCSV"   
+   Invoke-Item "$OutputCSV"     
   } 
+ Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+ Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
  }
 }
 
