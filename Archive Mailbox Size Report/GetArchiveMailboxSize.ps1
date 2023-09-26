@@ -4,7 +4,15 @@ Name:           Exchange Online Archive MAilbox Size Report
 Description:    This script exports Exchange Online Archive Mailbox sizes to CSV
 Version:        1.0
 Website:        o365reports.com
-Script by:      O365Reports Team
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.Validates and installs Exchange Online PowerShell module upon user confirmation (if not exists already) 
+2.Facility to supply the input and export the output in the CSV format 
+3.The report is delivered with the significant attributes. As it is the user–friendly script, you can publish desired attributes too. 
+4.Supports both MFA and Non-MFA accounts
+5.The script is scheduler-friendly. You can schedule the report generation upon giving UserName and Password. 
+
 For detailed script execution: https://o365reports.com/2021/03/30/export-office-365-archive-mailbox-size-report-using-powershell
 ============================================================================================
 #>
@@ -109,7 +117,7 @@ Write-Host "Exchange PowerShell Connected Successfully"
 
 $ExportCSVFileName = ".\ArchiveMailboxSizeReport_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv"
 
-Write-Host Generating report...
+Write-Host Generating report... `n
 #filtering the conditions based on the User Input param
 $WhereObjectCheck = $null
 if($UserMBOnly.IsPresent -or $SharedMBOnly.IsPresent)
@@ -165,15 +173,16 @@ else
 }
 else
 {
- Write-Host "The output file contains $global:ReportSize mailboxes."
+ Write-Host "The output file contains $global:ReportSize mailboxes."`n
 }
 #>
 
 #Open output file after execution
 if((Test-Path -Path $ExportCSVFileName) -eq "True") 
 { 
- Write-Host "The output file contains $global:ReportSize mailboxes."
- Write-Host "The Output file available in $ExportCSVFileName" -ForegroundColor Green 
+ Write-Host "The output file contains $global:ReportSize mailboxes."`n
+ Write-Host " The Output file available in:" -NoNewline -ForegroundColor Yellow
+ Write-Host $ExportCSVFileName 
  $prompt = New-Object -ComObject wscript.shell    
  $userInput = $prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)    
  If ($userInput -eq 6)    
@@ -187,3 +196,5 @@ else
 }
 
 Disconnect-ExchangeOnline -Confirm:$false | Out-Null
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
