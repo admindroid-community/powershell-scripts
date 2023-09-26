@@ -3,7 +3,19 @@
 Name:           Audit mailbox permission changes in Office 365
 Version:        1.0
 Website:        o365reports.com
-Script by:      O365Reports Team
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to retrieve audit logs.   
+2.The script can be executed with an MFA enabled account too.     
+3.Exports report results to CSV file.     
+4.Excludes system generated permission changes by default. 
+5.Helps to detect who modified mailbox permissions.  
+6.Tracks who granted full access, send as, send on behalf permissions separately. 
+7.Allows you to generate mailbox permission changes audit report for a custom period.     
+8.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.    
+9.The script is scheduler-friendly. i.e., Credential can be passed as a parameter instead of saving inside the script.
+
 For detailed script execution:  https://o365reports.com/2022/07/06/audit-mailbox-permission-changes-in-office-365-powershell
 ============================================================================================
 #>
@@ -288,7 +300,7 @@ else
  Write-Host `nThe output file contains $OutputEvents audit records
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
+  Write-Host `n "The Output file available in:" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCSV"`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -296,6 +308,8 @@ else
   {   
    Invoke-Item "$OutputCSV"   
   } 
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
  }
 }
 
