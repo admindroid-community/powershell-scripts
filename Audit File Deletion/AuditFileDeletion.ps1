@@ -1,4 +1,21 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           Audit File Deletion in Office 365
+Description:    This script exports deleted files audit records to CSV
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1. The script uses modern authentication to connect to Exchange Online.   
+2. The script can be executed with MFA enabled account too.   
+3. Exports report results to CSV file.   
+4. Helps to generate audit reports for custom periods. 
+5. Automatically installs the EXO V2 (if not installed already) upon your confirmation.  
+6. The script is scheduler-friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
+For detailed Script execution: https://o365reports.com/2021/12/15/find-out-who-deleted-files-from-office-365
+============================================================================================
+#>
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -238,8 +255,10 @@ else
  Write-Host `nThe output file contains $OutputEvents audit records
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
-  Write-Host `nFor more Office 365 related PowerShell scripts, check https://o365reports.com -ForegroundColor Cyan
+  Write-Host `n" The Output file available in"  -NoNewline -ForegroundColor Yellow; Write-Host $OutputCSV 
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green  
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+  Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -252,12 +271,3 @@ else
 
 #Disconnect Exchange Online session
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-
-
-<#
-=============================================================================================
-Name:           Audit File Deletion in Office 365
-website:        o365reports.com
-For detailed Script execution: https://o365reports.com/2021/12/15/find-out-who-deleted-files-from-office-365
-============================================================================================
-#>
