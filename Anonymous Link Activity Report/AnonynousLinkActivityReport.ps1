@@ -1,4 +1,22 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           SharePoint Online Anonymous Link Activity Report
+Description:    This script exports SharePoint Online anonymous link  activities report to CSV
+Version:        1.0
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.Allow to generate 8 different anonymous link reports. 
+2.The script uses modern authentication to retrieve audit logs.   
+3.The script can be executed with MFA enabled account too.   
+4.Exports report results to CSV file.   
+5.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.  
+6.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
+For detailed script execution: https://o365reports.com/2021/06/22/audit-anonymous-access-in-sharepoint-online-using-powershell
+============================================================================================
+#>
 
 Param
 (
@@ -32,7 +50,7 @@ Function Connect_Exo
    Exit
   }
  } 
- Write-Host Connecting to Exchange Online...
+ Write-Host `nConnecting to Exchange Online...
  #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
  if(($AdminName -ne "") -and ($Password -ne ""))
  {
@@ -247,7 +265,7 @@ while($true)
   }
  }
 }
-Write-Host "`nFor more Office 365 PowerShell scripts, please visit O365reports.com" -ForegroundColor cyan
+
 If($OutputEvents -eq 0)
 {
  Write-Host No records found
@@ -257,7 +275,10 @@ else
  Write-Host `nThe output file contains $OutputEvents audit records
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
+  Write-Host `n The Output file availble in: -NoNewline -ForegroundColor Yellow
+  Write-Host $OutputCSV 
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -267,11 +288,6 @@ else
   } 
  }
 }
-<#
-=============================================================================================
-Website:        o365reports.com
-For detailed script execution: https://o365reports.com/2021/06/22/audit-anonymous-access-in-sharepoint-online-using-powershell
-============================================================================================
-#>
+
 #Disconnect Exchange Online session
-Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
+#Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
