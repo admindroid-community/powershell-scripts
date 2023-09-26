@@ -1,13 +1,23 @@
 ﻿<#
 =============================================================================================
-Name:           Audit Office 365 external sharing activities report
-Description:    This script exports Office 365 external sharing activities to CSV
+Name:           Office 365 external user file access report
+Description:    This script exports SharePoint Online external user file access report to CSV
 Version:        1.0
 Website:        o365reports.com
-Script by:      O365Reports Team
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to connect to Exchange Online.    
+2.The script can be executed with MFA enabled account too.    
+3.Exports report results to CSV file.    
+4.Allows you to generate an external sharing report for a custom period.    
+5.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.   
+6.The script is scheduler-friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
 For detailed script execution: https://o365reports.com/2021/05/20/audit-sharepoint-online-external-sharing-using-powershell
 ============================================================================================
 #>
+
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -38,7 +48,7 @@ Function Connect_Exo
    Exit
   }
  } 
- Write-Host Connecting to Exchange Online...
+ Write-Host `nConnecting to Exchange Online...
  #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
  if(($AdminName -ne "") -and ($Password -ne ""))
  {
@@ -60,7 +70,7 @@ if(($StartDate -eq $null) -and ($EndDate -eq $null))
  $EndDate=(Get-Date).Date
  $StartDate=$MaxStartDate
 }
-
+$startDate
 #Getting start date to generate external sharing report
 While($true)
 {
@@ -247,7 +257,10 @@ else
  Write-Host `nThe output file contains $OutputEvents audit records
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
+  Write-Host `n The Output file availble in: -NoNewline -ForegroundColor Yellow
+  Write-Host $OutputCSV 
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
