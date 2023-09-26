@@ -1,4 +1,23 @@
-﻿Param
+﻿<#
+=============================================================================================
+Name:           Export Office 365 User Activity Report to CSV using PowerShell 
+Version:        2.0
+website:        o365reports.com
+
+Script Highlights:
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to connect to Exchange Online.  
+2.The script can be executed with MFA enabled account too.  
+3.Exports report results to CSV file.  
+4.Allows you to generate a user activity report for a custom period.  
+5.Automatically installs the EXO V2 module (if not installed already) upon your confirmation. 
+6.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
+For detailed Script execution: https://o365reports.com/2021/01/06/export-office-365-user-activity-report-to-csv-using-powershell/
+============================================================================================
+#>
+
+Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$MFA,
@@ -242,11 +261,13 @@ If($AggregateResultCount -eq 0)
 }
 else
 {
- Write-Host `nThe output file contains $AggregateResultCount audit records
+ Write-Host `nThe output file contains $AggregateResultCount audit records `n
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
-  Write-Host `nFor more Office 365 related PowerShell scripts, check https://o365reports.com -ForegroundColor Cyan
+  Write-Host " The Output file available in:" -NoNewline -ForegroundColor Yellow
+  Write-Host $OutputCSV 
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -259,14 +280,3 @@ else
 
 #Disconnect Exchange Online session
  Disconnect-ExchangeOnline -Confirm:$false | Out-Null
-
-
- <#
-=============================================================================================
-Name:           Audit user activity in Office 365
-website:        o365reports.com
-For detailed Script execution: https://o365reports.com/2021/01/06/export-office-365-user-activity-report-to-csv-using-powershell/
-
-============================================================================================
-#>
- 
