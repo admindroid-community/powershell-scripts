@@ -1,4 +1,27 @@
+<#
+=============================================================================================
+Name:           Export Office 365 mailbox users' OOF configuration status
+Description:    This script exports Office 365 mailbox users' OOF configuration status to CSV
+Version:        1.0
+Website:        o365reports.com
 
+Script Highlights:  
+~~~~~~~~~~~~~~~~~
+1. Generates 5 different types of out of office set up status reports  
+2. Automatically installs the Exchange Online module upon your confirmation when it is not available in your machine 
+3. Lists aggregated result of users with enabled and scheduled auto-reply set up 
+4. Retrieves users who have enabled auto-reply settings 
+5. Generates users who configured scheduled out of office set up separately 
+6. Lists currently unavailable users’ out of office configurations
+7. You have an option to get the disabled mailboxes with active automatic reply setting 
+8. Delivers Office 365 users’ upcoming out of office plans details 
+9. Supports both MFA and Non-MFA accounts
+10. Exports the report in CSV format
+11. The script is scheduler-friendly. You can automate the report generation upon passing credentials as parameters.
+
+For detailed Script execution: https://o365reports.com/2021/08/18/get-mailbox-automatic-reply-configuration-using-powershell
+============================================================================================
+#>
 
 param (
     [string] $UserName = $null,
@@ -20,7 +43,7 @@ Function ConnectToExchange {
         if ($confirm -match "[yY]") { 
             Write-host "Installing ExchangeOnlineManagement"
             Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
-            Write-host "ExchangeOnline PowerShell module is installed in the machine successfully."
+            Write-host "ExchangeOnline PowerShell module is installed in the machine successfully."`n
         }
         elseif ($confirm -cnotmatch "[yY]" ) { 
             Write-host "Exiting. `nNote: ExchangeOnline PowerShell module must be available in your system to run the script." 
@@ -36,7 +59,7 @@ Function ConnectToExchange {
     else {
         Connect-ExchangeOnline | Out-Null
     }
-    Write-Host "ExchangeOnline PowerShell module is connected successfully"
+    Write-Host "ExchangeOnline PowerShell module is connected successfully"`n
     #End of Connecting Exchange Online
 }
 
@@ -234,9 +257,12 @@ RetrieveOOFReport
 #Validates the output file
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
     #Open file after code execution finishes
-    Write-Host "The output file available in $global:ExportCSVFileName" -ForegroundColor Green 
-    write-host "Exported $global:ReportSize records to CSV." 
-    Write-Host "For more Office 365 related PowerShell scripts, check https://o365reports.com" -ForegroundColor Cyan
+    Write-Host " The output file available in:"-NoNewline -ForegroundColor Yellow; Write-Host $global:ExportCSVFileName 
+    Write-host `n"Exported $global:ReportSize records to CSV." `n
+    Write-Host "Disconnected active ExchangeOnline session" `n
+    Write-Host ~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+    Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n   
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)    
     If ($userInput -eq 6) {    
@@ -248,10 +274,3 @@ else {
 }
 
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-Write-Host "Disconnected active ExchangeOnline session"
-
-<#
-=============================================================================================
-For detailed Script execution: https://o365reports.com/2021/08/18/get-mailbox-automatic-reply-configuration-using-powershell
-============================================================================================
-#>
