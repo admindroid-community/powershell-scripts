@@ -1,4 +1,27 @@
-﻿param (
+﻿<#
+=============================================================================================
+Name:           Export Office 365 mailbox calendar permission Report 
+Website:        o365reports.com
+
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1. Generates 6 different mailbox calendar permissions reports. 
+2. The script uses modern authentication to retrieve calendar permissions. 
+3. The script can be executed with MFA enabled account too.    
+4. Exports report results to CSV file.    
+5. Allows you to track all the calendars’ permission  
+6. Helps to view default calendar permission for all the mailboxes 
+7. Displays all the mailbox calendars to which a user has access. 
+8. Lists calendars shared with external users. 
+9. Helps to find out calendar permissions for a list of mailboxes through input CSV. 
+10. Automatically install the EXO V2 module (if not installed already) upon your confirmation.   
+11. The script is scheduler-friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
+For detailed Script execution: https://o365reports.com/2021/11/02/get-calendar-permissions-report-for-office365-mailboxes-powershell
+============================================================================================
+#>
+param (
     [string] $UserName = $null,
     [string] $Password = $null,
     [Switch] $ShowAllPermissions,
@@ -280,10 +303,13 @@ RetrieveMBs
 
 #Validates the output file availability
 if ((Test-Path -Path $ExportCSVFileName) -eq "True") { 
-    #Open file after code execution finishes
-    Write-Host "The output file available in $global:ExportCSVFileName" -ForegroundColor Green 
-    Write-Host `nFor more Office 365 related PowerShell scripts, check https://o365reports.com -ForegroundColor Cyan
-    write-host "Exported $global:ReportSize records to CSV." 
+    #Open file after code execution finishes   
+    Write-Host `n" The output file available in:" -NoNewline -ForegroundColor Yellow; Write-Host .\$global:ExportCSVFileName `n
+    write-host "Exported $global:ReportSize records to CSV." `n
+    Write-Host "Disconnected active ExchangeOnline session" `n 
+    Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline;
+    Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n     
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)    
     If ($userInput -eq 6) {    
@@ -295,11 +321,4 @@ else {
 }
 
 #Disconneting the ExchangeOnline connection
-Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-Write-Host "Disconnected active ExchangeOnline session"
-
-<#
-=============================================================================================
-For detailed Script execution: https://o365reports.com/2021/11/02/get-calendar-permissions-report-for-office365-mailboxes-powershell
-============================================================================================
-#>
+Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue  
