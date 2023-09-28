@@ -3,8 +3,19 @@
 Name:           Export Office 365 SPO External Users Report
 Description:    This script exports Office 365 SPO external users to CSV
 Version:        1.0
-website:        o365reports.com
-Script by:      O365Reports Team
+Website:        o365reports.com
+
+Script Highlights:   
+~~~~~~~~~~~~~~~~~
+1. Generates 3 different SharePoint Online external user reports. 
+2. Automatically installs the SharePoint Management Shell module upon your confirmation when it is not available in your system.  
+3. Shows list of all external users in SharePoint Online in the tenant.   
+4. You can get SharePoint sites’ external users separately. 
+5. Allows retrieving external user accounts added recently. 
+6. Supports both MFA and Non-MFA accounts.     
+7. Exports the report in CSV format.   
+8. Scheduler-friendly. You can automate the report generation upon passing credentials as parameters. 
+
 For detailed Script execution: http://o365reports.com/2021/08/03/get-all-external-users-in-sharepoint-online-powershell
 ============================================================================================
 #>
@@ -28,9 +39,9 @@ Function ConnectSPOService {
         Write-host "Important: SharePoint Online Management Shell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully."  
         $confirm = Read-Host Are you sure you want to install module? [Y] Yes [N] No  
         if ($confirm -match "[yY]") { 
-            Write-host "Installing SharePoint Online Management Shell Module"
+            Write-host `n"Installing SharePoint Online Management Shell Module"
             Install-Module -Name Microsoft.Online.SharePoint.PowerShell -Allowclobber -Repository PSGallery -Force
-            Write-host "SharePoint Online Management Shell module is installed in the system successfully."
+            Write-host `n"SharePoint Online Management Shell module is installed in the system successfully."
         }
         else { 
             Write-host "Exiting. `nNote: SharePoint Online Management Shell module must be available in your system to run the script."  
@@ -48,7 +59,7 @@ Function ConnectSPOService {
     else {   
         Connect-SPOService -Url $ConnectionUrl | Out-Null
     }
-    Write-Host "SharePoint Online Management Shell module is connected successfully"
+    Write-Host `n"SharePoint Online Management Shell module is connected successfully"`n
     #End of Connecting SPO Module
 }
 
@@ -71,7 +82,7 @@ Function FindGuestUsers {
                 }
         }
         if ($global:ExportedGuestUser -eq 0) {
-            Write-Host "No SharePoint Online guests in any SharePoint Online sites in your tenant" -ForegroundColor Magenta
+            Write-Host `n"No SharePoint Online guests in any SharePoint Online sites in your tenant" -ForegroundColor Magenta
         }
     }
    
@@ -148,9 +159,13 @@ $global:ExportedGuestUser = 0
 FindGuestUsers
 
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
-    #Open file after code execution finishes
-    Write-Host "The output file available in $global:ExportCSVFileName" -ForegroundColor Green 
-    write-host "Exported $global:ExportedGuestUser records to CSV." 
+    #Open file after code execution finishes  
+    Write-Host " The output file available in:" -NoNewline -ForegroundColor Yellow; Write-Host .\$global:ExportCSVFileName `n
+    write-host "Exported $global:ExportedGuestUser records to CSV." `n 
+    Write-host "Disconnected SPOService Session Successfully" `n 
+    Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green  
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+    Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)    
     If ($userInput -eq 6) {    
@@ -158,4 +173,3 @@ if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {
     }  
 } 
 Disconnect-SPOService
-Write-host "Disconnected SPOService Session Successfully"
