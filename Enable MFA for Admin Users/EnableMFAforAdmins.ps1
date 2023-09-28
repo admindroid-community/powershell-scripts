@@ -3,7 +3,15 @@
 Name:           Enable MFA for all Office 365 admins
 Version:        1.0
 Website:        m365scripts.com
-Script by:      M365Scripts Team
+
+Script Highlights:
+~~~~~~~~~~~~~~~~~
+1.Finds admins without MFA and enables MFA for them.
+2.Allows to enable MFA for licensed admins alone.
+3.Exports MFA enabling status to CSV file.
+4.The script can be executed with MFA enabled account.
+5.Credentials are passed as parameters, so worry not!
+
 For detailed script execution: https://m365scripts.com/security/enabling-mfa-for-admins-using-powershell/
 ============================================================================================
 #>
@@ -42,7 +50,7 @@ if($MsOnline -eq $null)
 Import-Module MsOnline -Force 
 
 #CONNECTING TO MSOLSERVICE.......
-Write-Host "Connecting to Msolservice..."
+Write-Host "Connecting to Msolservice..."`n
 if(($UserName -ne "") -and ($Password -ne ""))
 {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
@@ -62,7 +70,7 @@ $MultiFactorAuthentication = @($MultiFactorAuthentication_Object)
 
 
 #Separating Admin without MFA And Enable MFA for them
-Write-Host "Preparing Admin Without MFA List And Enable MFA for them..."
+Write-Host "Preparing Admin Without MFA List And Enable MFA for them..."`n
 $OutputCsv=".\AdminsWithoutMFAReport_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv"
 $global:CountForSuccess = 0
 $global:CountForFailed = 0
@@ -122,17 +130,19 @@ if($CountForSuccess -ne 0 -or $CountForFailed -ne 0)
  }
  else
  { 
-   Write-Host "Already All the Admins are enabled MFA"
+   Write-Host "Already All the Admins are enabled MFA"`n`n
  } 
 
 
 #Open output file after execution 
 if((Test-Path -Path $OutputCsv) -eq "True") { 
- Write-Host "The Output file availble in $outputCsv" -ForegroundColor Green 
+ Write-Host `n "The Output file availble in:" -NoNewline -ForegroundColor Yellow; Write-Host "$outputCsv"
  $Prompt = New-Object -ComObject wscript.shell    
  $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)    
  If ($UserInput -eq 6)    
   {    
    Invoke-Item "$OutputCSV"    
-  }  
+  }
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
 } 
