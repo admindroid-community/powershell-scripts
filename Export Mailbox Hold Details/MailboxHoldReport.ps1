@@ -1,11 +1,23 @@
 <#
 =============================================================================================
-Name:           Export Office 365 Email Holds Report
-Description:    This script exports Office 365 Email Holds to CSV
+Name:           Export Office 365 Mailbox Holds Report
+Description:    This script exports hold enabled mailboxes to CSV
 Version:        1.0
-website:        o365reports.com
-Script by:      O365Reports Team
-For detailed Script execution: http://o365reports.com/2021/06/28/export-office-365-mailbox-holds-report-using-powershell
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.Generates 4 different mailbox holds reports.  
+2.Automatically installs the Exchange Online module upon your confirmation when it is not available in your machine. 
+3.Shows list of the mailboxes with all the active holds information for each mailbox. 
+4.Shows the mailboxes with litigation hold enabled along with hold duration and other details. 
+5.Displays in-place hold applied mailboxes. 
+6.Lists mailboxes that are placed on retention hold and their retention policy. 
+7.Supports both MFA and Non-MFA accounts.    
+8.Exports the report in CSV format.  
+9.Scheduler-friendly. You can automate the report generation upon passing credentials as parameters. 
+
+For detailed Script execution: http://o365reports.com/2021/06/29/export-office-365-mailbox-holds-report-using-powershell
 ============================================================================================
 #>
 
@@ -199,8 +211,10 @@ $global:ExportedMailbox = 0
 RetrieveAllHolds
   
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
-    Write-Host "The output file available in $global:ExportCSVFileName" -ForegroundColor Green 
-    write-host "There are $global:ExportedMailbox mailboxes records in the output file" 
+    Write-Host `n" The output file available in:"  -NoNewline -ForegroundColor Yellow 
+	Write-Host .\$global:ExportCSVFileName 
+	Write-Host ""
+    Write-host "There are $global:ExportedMailbox mailboxes records in the output file" `n
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)    
     If ($userInput -eq 6) {    
@@ -212,3 +226,5 @@ else {
 }
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
 Write-Host "Disconnected active ExchangeOnline session"
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
