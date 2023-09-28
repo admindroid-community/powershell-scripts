@@ -3,6 +3,16 @@
 Name:           Find inbox rules with external email forwarding
 Description:    This script Finds all inbox rules that forwards emails externally in Office 365 using PowerShell 
 Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to connect to Exchange Online.
+2.The script can be executed with MFA enabled account.
+3.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.
+4.Helps to filter-out forwarding rules that forwards emails to external users by excluding guest accounts. 
+5.The script is scheduler – friendly. i.e., credentials can be passed as parameters rather than being saved inside the script.
+6.Exports the report result to a CSV file. 
+
 For detailed script execution: https://o365reports.com/2022/06/09/find-office365-inbox-rules-with-external-forwarding-powershell
 ============================================================================================
 #>
@@ -25,7 +35,7 @@ if ($Exchange -eq $null)
   Write-Host "Installing ExchangeOnlineManagement..." -ForegroundColor Magenta
   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
   Import-Module ExchangeOnlineManagement -Force
-  Write-Host "ExchangeOnline PowerShell module is installed in the machine successfully." -ForegroundColor Green
+  Write-Host "ExchangeOnline PowerShell module is installed in the machine successfully." -ForegroundColor Green `n
  }
  else
  { 
@@ -46,7 +56,7 @@ else
 {
  Connect-ExchangeOnline
 }
-Write-Host "ExchangeOnline module successfully connected..." -ForegroundColor Green
+Write-Host "ExchangeOnline module successfully connected..." -ForegroundColor Green `n
 
 #Function for export output to CSV file
 Function ExportCSV
@@ -64,7 +74,7 @@ Function ExportCSV
 }
 
 #Getting InboxRules with external email configuration......
-Write-Host "Getting InboxRules with external email configuration..."
+Write-Host "Getting InboxRules with external email configuration..."`n
 $OutputCsv=".\InboxRuleWithExternalEmails_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv"
 $InboxRuleCount = 0
 $Global:InboxRuleWithExternalEmailCount = 0
@@ -176,7 +186,7 @@ Get-Mailbox -ResultSize unlimited | foreach {
   ExportCSV
  }
 }
-Write-Host "Script executed successfully."
+Write-Host "Script executed successfully." `n
 
 #Open output file after execution
 if($InboxRuleCount -eq 0)
@@ -185,7 +195,7 @@ if($InboxRuleCount -eq 0)
 }
 else
 {
- Write-Host "$InboxRuleCount InboxRule found in this organization." 
+ Write-Host "$InboxRuleCount InboxRule found in this organization." `n
  if($Global:InboxRuleWithExternalEmailCount -eq 0)
  {
   Write-Host "But no InboxRule found with external email."
@@ -194,14 +204,16 @@ else
  {
   Write-Host "$Global:InboxRuleWithExternalEmailCount InboxRule found with external email."
   if((Test-Path -Path $OutputCsv) -eq "True") 
-  { 
-   Write-Host "The InboxRule with external email configuration report available in : $OutputCsv " -ForegroundColor Green 
+  {   
+   Write-Host `n "The InboxRule with external email configuration report available in:" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCsv" 
    $Prompt = New-Object -ComObject wscript.shell    
    $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)    
    If ($UserInput -eq 6)    
    {    
     Invoke-Item "$OutputCSV"    
-   }  
+   } 
+ Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+ Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n   
   }
  }
 }
