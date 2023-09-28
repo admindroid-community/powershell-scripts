@@ -1,4 +1,23 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           Audit Microsoft Teams meetings using PowerShell
+Description:    This script exports Teams meeting report and attendance report into 2 CSV files.
+website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1. The script uses modern authentication to connect to Exchange Online.   
+2. The script can be executed with MFA enabled account too.   
+3. Exports report results to CSV file.   
+4. Allows you to generate a Teams meetings audit log.   
+5. Exports Teams meeting attendance report. 
+6. Helps to generate reports for custom periods. 
+7. Automatically installs the EXO V2 and AzureAD module (if not installed already) upon your confirmation.  
+8. The script is scheduler-friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
+For detailed Script execution:  https://o365reports.com/2021/12/08/microsoft-teams-meeting-attendance-report
+============================================================================================
+#>
 
 Param
 (
@@ -188,7 +207,7 @@ while($true)
  Search-UnifiedAuditLog -StartDate $CurrentStart -EndDate $CurrentEnd -Operations $RetriveOperation -SessionId s -SessionCommand ReturnLargeSet -ResultSize 5000 | ForEach-Object {
   $ResultCount++
   $ProcessedAuditCount++
-  Write-Progress -Activity "`n     Retrieving Team meeting participant report from $CurrentStart to $CurrentEnd.."`n" Processed audit record count: $ProcessedAuditCount"
+  Write-Progress -Activity "`n     Retrieving Team meeting participant report..."`n" Processed audit record count: $ProcessedAuditCount"
   $AuditData=$_.AuditData  | ConvertFrom-Json
   $MeetingID=$AuditData.MeetingDetailId
   $CreatedBy=$_.UserIDs
@@ -266,10 +285,12 @@ If($OutputEvents -eq 0)
 else
 {
  Write-Host `nThe Teams meeting attendance report contains $OutputEvents audit records -ForegroundColor Green
- Write-Host `nFor more Office 365 related PowerShell scripts, check https://o365reports.com -ForegroundColor Cyan
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Teams meetings attendance report available in $OutputCSV -ForegroundColor Cyan
+  Write-Host `n" The Teams meetings attendance report available in: " -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCSV"
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+  Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -284,9 +305,4 @@ else
 #Disconnect Exchange Online session
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
 
-<#
-=============================================================================================
-Name:           Audit Microsoft Teams meetings using PowerShell
-For detailed Script execution:  https://o365reports.com/2021/12/08/microsoft-teams-meeting-attendance-report
-============================================================================================
-#>
+
