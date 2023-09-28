@@ -4,7 +4,17 @@ Name:           Export Exchange Online Non-audited mailbox Activities
 Description:    This script exports non-audited mailbox activities to CSV file
 Version:        1.0
 Website:        o365reports.com
-Script by:      O365Reports Team
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1. The script uses modern authentication to connect to Exchange Online. 
+2. The script can be executed with MFA enabled account. 
+3. Exports the report result to a CSV file. 
+4. Lists the non-audited mailbox actions for each logon type (Admin, Owner, Delegate). 
+5. Helps to identify audit bypassed mailboxes. 
+6. Automatically installs the EXO V2 module (if not installed already) upon your confirmation. 
+7. Credentials are passed as parameters (scheduler-friendly), so worry not! i.e., credentials can be passed as parameters rather than being saved inside the script.
+
 For detailed script execution: https://o365reports.com/2022/05/31/identify-non-audited-mailbox-activities-and-take-necessary-actions
 ============================================================================================
 #>
@@ -43,7 +53,7 @@ function Connect_Exo {
     else {
         Connect-ExchangeOnline
     }
-    Write-Host "ExchangeOnline PowerShell module is connected successfully"
+    Write-Host "ExchangeOnline PowerShell module is connected successfully"`n
 }
 $global:ExportCSVFileName = "Mailboxes_NonAuditingActions_Report_" + ((Get-Date -format "MMM-dd hh-mm-ss tt").ToString()) + ".csv"
 function MailboxNotAudited {
@@ -90,7 +100,12 @@ function MailboxNotAudited {
 Connect_Exo
 MailboxNotAudited
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
-    Write-Host "Mailboxes and disabled auditing actions are exported. The report available in `"$global:ExportCSVFileName`"" -ForegroundColor Green 
+    Write-Host "Mailboxes and disabled auditing actions are exported"`n
+    Write-Host " The report available in:" -NoNewline -ForegroundColor Yellow; Write-Host .\$global:ExportCSVFileName `n
+    Write-Host "Disconnected active ExchangeOnline session"
+    Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+    Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output files?", 0, "Open Output File", 4)    
     if ($userInput -eq 6) {    
@@ -98,4 +113,3 @@ if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {
     }  
 }
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-Write-Host "Disconnected active ExchangeOnline session"
