@@ -1,6 +1,15 @@
 ﻿<# Purpose      : Enable mailbox audit logging for all Office 365 mailboxes
    Last updated : Oct 22, 2022
    Website      : https://O365reports.com
+ 
+Script Highlights:
+~~~~~~~~~~~~~~~~~~
+
+1.You can enable mailbox audit logging for all mailboxes using single cmdlet 
+2.This script allows you to enable mailbox auditing for all mailbox actions or set of actions 
+3.The script can be executed with MFA enabled account also. 
+4.This script automatically installs Exchange Online PowerShell Module upon your confirmation  
+   
    For execution steps and usecases: https://o365reports.com/2020/01/21/enable-mailbox-auditing-in-office-365-powershell
 #>
 
@@ -91,5 +100,7 @@ else
   Set-Mailbox -Identity $_.PrimarySmtpAddress -AuditEnabled $true -AuditAdmin $EnableAuditAdmin -AuditDelegate $EnableAuditDelegate -AuditOwner $EnableAuditowner
  }
 }
-Write-Host `nMailbox Audit logging enabled for $MBCount mailboxes -ForegroundColor Green
+Write-Host `nMailbox Audit logging enabled for $MBCount mailboxes -ForegroundColor Yellow `n
 Write-Host "Mailbox Audit Logging enabled following operation(s):" $RequiredOperations
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
