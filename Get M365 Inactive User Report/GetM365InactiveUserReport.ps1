@@ -228,3 +228,5 @@ else
 {
     Write-Host "No user found" -ForegroundColor Red
 }
+ Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n `n 
