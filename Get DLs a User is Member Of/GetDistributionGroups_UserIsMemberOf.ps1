@@ -3,7 +3,18 @@
 Name:           Export Distrbution Groups a user is member of
 Description:    This script exports all users and their distribution group membership
 Website:        o365reports.com
-Script by:      o365reports Team
+
+Script Highlights:
+~~~~~~~~~~~~~~~~~
+1. The script uses modern authentication to connect to Exchange Online.
+2. The script can be executed with MFA enabled account
+3. Automatically installs the EXO V2 module (if not installed already) upon your confirmation.
+4. Credentials are passed as parameters, so worry not!
+5. Allows generating user membership reports based on your requirement.
+   a.DL membership for all users.
+   b. DL membership for a list of users (import CSV).
+   c. DL membership for a single user.
+
 For detailed script execution: https://o365reports.com/2022/04/19/list-all-the-distribution-groups-a-user-is-member-of-using-powershell/
 ============================================================================================
 #>
@@ -112,8 +123,10 @@ Function OpenOutputCsv
     #Open Output File After Execution 
     If((Test-Path $OutputCsv) -eq "True") 
     {			
-        Write-Host "The Output file available in $OutputCsv" 
-        Write-Host `nThe output file contains $ProcessedUserCount users. -ForegroundColor Green
+        Write-Host `n"The output file contains:" -NoNewline -ForegroundColor Yellow; Write-Host $ProcessedUserCount users `n
+        Write-Host " The Output file available in:" -NoNewline -ForegroundColor Yellow; $OutputCsv
+        Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+        Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline;                                            Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
         $Prompt = New-Object -ComObject wscript.shell    
         $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"open output file",4)    
         If($UserInput -eq 6)    
