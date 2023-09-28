@@ -30,11 +30,11 @@ Param
 
 Function Connect_Exo
 {
- #Check for EXO v2 module inatallation
+ #Check for EXO module inatallation
  $Module = Get-Module ExchangeOnlineManagement -ListAvailable
  if($Module.count -eq 0) 
  { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  Write-Host Exchange Online PowerShell  module is not available  -ForegroundColor yellow  
   $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
   if($Confirm -match "[yY]") 
   { 
@@ -43,7 +43,7 @@ Function Connect_Exo
   } 
   else 
   { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
  } 
@@ -144,7 +144,7 @@ $ProcessedAuditCount=0
 $OutputEvents=0
 $ExportResult=""   
 $ExportResults=@()  
-$RetriveOperation="FileDeleted,FileDeletedFirstStageRecycleBin,FileDeletedSecondStageRecycleBin"
+$RetriveOperation="FileDeleted,FileDeletedFirstStageRecycleBin,FileDeletedSecondStageRecycleBin,FileRecycled"
 
  #Checking whether the user is available
 #if(($FilesDeletedBy.Length -ne 0) -and ((Get-Mailbox -Identity $Mailbox) -eq $null))
