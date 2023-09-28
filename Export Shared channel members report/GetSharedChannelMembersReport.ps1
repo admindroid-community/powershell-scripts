@@ -1,7 +1,18 @@
 ﻿<#
 =============================================================================================
 Name:           Microsoft Teams Shared Channel Members Report
-website:        o365reports.com
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.A single script allows you to generate shared channel reports for all teams or a specific team.   
+2.The script can be executed with MFA enabled accounts too.  
+3.Exports output to CSV.  
+4.Automatically installs Microsoft Teams PowerShell module (if not installed already) upon your confirmation.  
+5.It generates 2 output files. One is shared channels report, and another is shared channel membership report. 
+6.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+7.Supports certificate-based authentication.
+
 For detailed Script execution:  https://o365reports.com/2023/02/28/ms-teams-shared-channel-membership-report
 ============================================================================================
 #>
@@ -129,8 +140,8 @@ Write-Host `nScript executed successfully
 Write-Host `n$SharedChannelCount shared channels exported in the output file.
 if((Test-Path -Path $OutputCSVName) -eq "True") 
 {
- Write-Host "Shared channel summary report available in: $OutputCSVName"  -ForegroundColor Green 
- Write-Host "Detailed shared channel membership report available in: $OutputCSV"  -ForegroundColor Green
+ Write-Host `n "Shared channel summary report available in: " -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCSVName"`n 
+ Write-Host `n "Detailed shared channel membership report available in: " -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCSV"`n 
  $Prompt = New-Object -ComObject wscript.shell   
  $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -138,5 +149,7 @@ if((Test-Path -Path $OutputCSVName) -eq "True")
  {   
   Invoke-Item "$OutputCSVName"
   Invoke-Item "$OutputCSV"   
- }  
+ } 
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
 } 
