@@ -1,4 +1,26 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           Find who sent email from shared mailbox
+Description:    This script finds who sent emails from shared mailbox
+Version:        1.0
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~~
+
+1.The script uses modern authentication to retrieve audit logs.    
+2.The script can be executed with an MFA-enabled account too.    
+3.Exports report results to CSV file.    
+4.Helps to generate audit reports for custom periods.  
+5.Tracks email sent activities from a specific shared mailbox. 
+6.Allows to audit send as activities separately. 
+7.Allows to track send on behalf activities separately. 
+8.Automatically installs the EXO V2 (if not installed already) upon your confirmation.   
+9.The script is scheduler-friendly.i.e., Credentials can be passed as a parameter. 
+
+For detailed script execution: https://o365reports.com/2022/05/11/find-who-sent-email-from-shared-mailbox-in-office-365-using-powershell
+============================================================================================
+#>
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -259,10 +281,11 @@ If($OutputEvents -eq 0)
 }
 else
 {
- Write-Host `nThe output file contains $OutputEvents audit records
+ Write-Host `nThe output file contains $OutputEvents audit records `n
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
+  Write-Host " The Output file availble in:" -NoNewline -ForegroundColor Yellow 
+  Write-Host $OutputCSV 
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -275,11 +298,5 @@ else
 
 #Disconnect Exchange Online session
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-
-<#
-=============================================================================================
-Name:           Find who sent emails from shared mailboxes
-Website:        o365reports.com
-For detailed script execution: https://o365reports.com/2022/05/11/find-who-sent-email-from-shared-mailbox-in-office-365-using-powershell
-============================================================================================
-#>
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
