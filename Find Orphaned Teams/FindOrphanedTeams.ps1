@@ -1,4 +1,22 @@
-﻿#Accept input paramenters 
+﻿<#
+=============================================================================================
+Name:           Find orphaned teams in Microsoft Teams
+Description:    This script exports teams without owner to CSV file
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1. The script can be executed with MFA enabled account too. 
+2. This script uses modern authentication to connect to Microsoft Teams PowerShell.
+3. Automatically installs Microsoft Teams module (if not installed already) upon your confirmation. 
+4. Lastly, it exports orphaned teams to CSV file.
+5. Also, the script is scheduler-friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
+For detailed Script execution: https://o365reports.com/2022/01/05/finding-and-managing-microsoft-teams-without-owner
+============================================================================================
+#>
+
+#Accept input paramenters 
 param(
 [string]$UserName, 
 [string]$Password
@@ -88,7 +106,10 @@ else
  Write-Host `nThe output file contains $ExportedCount orphaned Teams.
  if((Test-Path -Path $ExportCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $ExportCSV -ForegroundColor Green
+  Write-Host `n" The Output file availble in:" -NoNewline -ForegroundColor Yellow; Write-Host $ExportCSV 
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline;
+  Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
@@ -98,10 +119,3 @@ else
   } 
  }
 }
-<#
-=============================================================================================
-Name:           Find orphaned teams in Microsoft Teams
-website:        o365reports.com
-For detailed Script execution: https://o365reports.com/2022/01/05/finding-and-managing-microsoft-teams-without-owner
-============================================================================================
-#>
