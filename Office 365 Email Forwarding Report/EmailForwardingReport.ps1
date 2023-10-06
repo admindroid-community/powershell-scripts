@@ -1,3 +1,24 @@
+<#
+=============================================================================================
+Name:           Export Office 365 Email Forwarding Report using PowerShell 
+Description:    This script exports Office 365 email forwarding report  to CSV format
+Version:        1.0
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.Generates 3 different email forwarding rules reports.  
+2.Automatically installs the Exchange Online module upon your confirmation when it is not available in your machine. 
+3.Shows mailboxes in which email forwarding configured through ‘Forwarding SMTP Address’ and ‘Forward To’. 
+4.Lists all inbox rules that forward email to others’ mailbox. 
+5.Identifies transport rule that redirects emails to mailboxes 
+6.Supports both MFA and Non-MFA accounts.    
+7.Exports the report in CSV format.  
+8.The script is scheduler-friendly. You can automate the report generation upon passing credentials as parameters. 
+
+For detailed script execution: https://o365reports.com/2021/06/09/export-office-365-email-forwarding-report-using-powershell/
+============================================================================================
+#>
 
 param(
     [string] $UserName = $null,
@@ -18,7 +39,7 @@ Function GetPrintableValue($RawData) {
 }
 
 Function GetAllMailForwardingRules {
-    Write-host "Preparing the Email Forwarding Report..."
+    Write-host `n"Preparing the Email Forwarding Report..."
     if($InboxRules.IsPresent) {
         $global:ExportCSVFileName = "InboxRulesWithEmailForwarding_" + ((Get-Date -format "MMM-dd hh-mm-ss tt").ToString()) + ".csv"
         Get-Mailbox -ResultSize Unlimited | ForEach-Object { 
@@ -143,9 +164,9 @@ $global:ReportSize = 0
 GetAllMailForwardingRules
 Write-Progress -Activity "--" -Completed
 
-Write-Host "`nFor more Office 365 PowerShell scripts, please visit O365reports.com" -ForegroundColor cyan
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
-    Write-Host "The output file available in $global:ExportCSVFileName" -ForegroundColor Green 
+    Write-Host `n" The output file available in:" -NoNewline -ForegroundColor Yellow
+    Write-Host	.\$global:ExportCSVFileName `n
     Write-Host "The exported report has $global:ReportSize email forwarding configurations"
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)    
@@ -157,5 +178,7 @@ else {
     Write-Host "No data found with the specified criteria"
 }
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-Write-Host "Disconnected active ExchangeOnline session"
-
+    Write-Host `n"Disconnected active ExchangeOnline session"
+    Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+  

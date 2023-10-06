@@ -3,6 +3,21 @@
 Name:           Office 365 User Login History Report
 Website:        o365reports.com
 Version:        3.0
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+
+1.The script uses modern authentication to connect to Exchange Online.
+2.Allows you to filter the result based on successful and failed logon attempts. 
+3.The exported report has IP addresses from where your office 365 users are login. 
+4.This script can be executed with MFA enabled account. 
+5.You can export the report to choose either “All Office 365 users’ login attempts” or “Specific Office user’s logon attempts”. 
+6.By using advanced filtering options, you can export “Office 365 users Sign-in report” and “Suspicious login report”. 
+7.Exports report result to CSV. 
+8.Automatically installs the EXO V2 module (if not installed already) upon your confirmation. 
+9.This script is scheduler friendly. I.e., credentials can be passed as a parameter instead of saving inside the script. 
+10.Our Logon history report tracks login events in AzureActiveDirectory (UserLoggedIn, UserLoginFailed), ExchangeOnline (MailboxLogin) and MicrosoftTeams (TeamsSessionStarted). 
+
 For detailed Script execution: https://o365reports.com/2019/12/23/export-office-365-users-logon-history-report/
 ============================================================================================
 #>
@@ -189,7 +204,12 @@ else
 {
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
+  Write-Host ""
+  Write-Host " The Output file availble in:" -NoNewline -ForegroundColor Yellow
+  Write-Host $OutputCSV 
+    Write-Host `nThe output file contains $AggregateResults audit records
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
  }
- Write-Host `nThe output file contains $AggregateResults audit records
+ 
 }

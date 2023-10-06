@@ -3,7 +3,35 @@
 Name:           Export Dynamic Distribution Group Members Report
 Version:        2.0
 Website:        o365reports.com
-Script by:      O365Reports Team
+
+Script Highlights:
+~~~~~~~~~~~~~~~~~~
+
+1.The script can be executed with MFA enabled account.
+2.Allows you to filter the output based on group size (i.e., Members count).
+3.You can choose to either “export members of all Dynamic Distribution Groups” or pass an input file to get members of specific groups alone. 
+4.Output can be filtered to list Empty group. i.e., DDL without members
+5.Exports the result to CSV 
+6.You can get members count based on Member Type such as user mailbox, Group mailbox, shared mailbox, contact, etc
+7.Above all, script stores output in nicely formatted 2 CSV files. One with detailed information and another with summary information.
+8.Dynamic Distribution Group – Summary Report : Following are the columns available
+   a.Group Display Name,
+   b.Primary SMTP Address,  
+   c.Group Alias,
+   d.Group Manager,
+   e.Hidden From Address List,
+   f.Group Members Count,
+   g.Members Count by Type
+9.Dynamic Distribution Group – Detailed Members Report : Following are the columns available
+   a.Group Display Name,
+   b.Primary SMTP Address,  
+   c.Group Alias,
+   d.Group Manager,
+   e.Group Members Count,
+   f.Group Members,
+   g.Member Email Address
+   h.Member Type 
+
 For detailed script execution:  https://o365reports.com/2019/03/23/export-dynamic-distribution-group-members-to-csv/
 ============================================================================================
 #>
@@ -229,8 +257,13 @@ Function main()
  Write-Host `nScript executed successfully
  if((Test-Path -Path $ExportCSV) -eq "True")
  {
-  Write-Host Detailed report available in: $ExportCSV
-  Write-host Summary report available in: $ExportSummaryCSV
+  Write-Host ""
+  Write-Host " Detailed report available in:" -NoNewline -ForegroundColor Yellow 
+  Write-Host $ExportCSV `n
+  Write-host " Summary report available in:" -NoNewline -ForegroundColor Yellow 
+  Write-Host $ExportSummaryCSV
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell  
   $UserInput = $Prompt.popup("Do you want to open output file?",`  
   0,"Open Output File",4)  
@@ -244,7 +277,6 @@ Function main()
  {
   Write-Host No DynamicDistributionGroup found
  }
- Write-Host "For more Office 365 reports, do check AdminDroid Office 365 reporting tool." -ForegroundColor Cyan
  #Clean up session 
  Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
 }

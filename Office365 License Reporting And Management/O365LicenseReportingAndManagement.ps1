@@ -1,4 +1,23 @@
-﻿
+﻿<#
+=============================================================================================
+Name:           Office 365 license reporting and management tool
+Description:    This script can perform 10+ Office 365 reporting and management activities
+Website:        o365reports.com
+
+Script Highlights:
+~~~~~~~~~~~~~~~~~ 
+
+    1. Generates 5 Office 365 license reports. 
+    2. Allows to perform 6 license management actions that includes, adding or removing licenses in bulk. 
+    3. License Name is shown with its friendly name  like ‘Office 365 Enterprise E3’ rather than ‘ENTERPRISEPACK’.
+    4. The script can be executed with an MFA enabled account too. 
+    5. Exports the report result to CSV. 
+    6. Exports license assignment and removal log file. 
+    7. The script is scheduler-friendly. i.e., you can pass the credentials as a parameter instead of saving them inside the script.
+
+For detailed Script execution: https://o365reports.com/2021/11/23/office-365-license-reporting-and-management-using-powershell
+============================================================================================
+#>
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -17,14 +36,19 @@ Function Open_OutputFile
  {
   if($ActionFlag -eq "Report")
   {
-   Write-Host Detailed license report is available in: $OutputCSVName -Foregroundcolor Green
+   Write-Host " Detailed license report is available in:" -NoNewline -ForegroundColor Yellow; Write-Host $OutputCSVName `n
    Write-Host The report has $ProcessedCount records
-  }
+   Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+   Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+   Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+   }
   elseif($ActionFlag -eq "Mgmt")
   {
-   Write-Host License assignment/removal log file is available in: $OutputCSVName -ForegroundColor Green
+     Write-Host " License assignment/removal log file is available in:" -NoNewline -ForegroundColor Yellow; Write-Host $OutputCSVName 
+     Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+     Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+     Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   } 
-  Write-Host `nFor more Office 365 related PowerShell scripts, check https://o365reports.com -ForegroundColor Cyan
   $Prompt = New-Object -ComObject wscript.shell  
   $UserInput = $Prompt.popup("Do you want to open output file?",`  
  0,"Open Output File",4)  
@@ -35,7 +59,10 @@ Function Open_OutputFile
  }
  Else
  {
-  Write-Host No records found
+  Write-Host `nNo records found
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
+  Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
  }
  Write-Progress -Activity Export CSV -Completed
 }
@@ -178,7 +205,7 @@ Function main()
   Switch ($GetAction) {
    1 {
       $OutputCSVName=".\O365UserLicenseReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
-      Write-Host Generating licensed users report...
+      Write-Host `nGenerating licensed users report...`n
       $ProcessedCount=0
       Get-MsolUser -All | where {$_.IsLicensed -eq $true} | foreach {
        $ProcessedCount++
@@ -195,7 +222,7 @@ Function main()
 
   2 {
      $OutputCSVName=".\O365UnlicenedUserReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
-     Write-Host Generating Unlicensed users report...
+     Write-Host `nGenerating Unlicensed users report...`n
      $ProcessedCount=0
      Get-MsolUser -All -UnlicensedUsersOnly | foreach {
       $ProcessedCount++
@@ -213,9 +240,9 @@ Function main()
      $OutputCSVName="./O365UsersWithSpecificLicenseReport__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
      if($LicenseName -eq "")
      {
-      $LicenseName=Read-Host "Enter the license SKU(Eg:contoso:Enterprisepack)"
+      $LicenseName=Read-Host "`nEnter the license SKU(Eg:contoso:Enterprisepack)"
      }
-     Write-Host Getting users with $LicenseName license...
+     Write-Host `nGetting users with $LicenseName license...`n
      $ProcessedCount=0
      if((Get-MsolAccountSku).AccountSkuID -icontains $LicenseName)
      {
@@ -242,7 +269,7 @@ Function main()
   4 {
      $OutputCSVName="./O365DiabledUsersWithLicense__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
      $ProcessedCount=0
-     Write-Host Finding disabled users still licensed in Office 365...
+     Write-Host `nFinding disabled users still licensed in Office 365...`n
      Get-MsolUser -All -EnabledFilter DisabledOnly | where {$_.IsLicensed -eq $true} | foreach {
       $ProcessedCount++
       Get_UserInfo
@@ -261,7 +288,7 @@ Function main()
 
   5 {
      $OutputCSVName="./Office365LicenseUsageReport__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
-     Write-Host Generating Office 365 license usage report...
+     Write-Host `nGenerating Office 365 license usage report...`n
      $ProcessedCount=0
      Get-MsolAccountSku | foreach {
       $ProcessedCount++
@@ -284,14 +311,14 @@ Function main()
 
   6 {
      $OutputCSVName="./Office365LicenseAssignment_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
-     $UserNamesFile=Read-Host "Enter the CSV file containing user names(Eg:D:/UserNames.csv)"
+     $UserNamesFile=Read-Host "`nEnter the CSV file containing user names(Eg:D:/UserNames.csv)"
   
      #We have an input file, read it into memory
      $UserNames=@()
      $UserNames=Import-Csv -Header "UPN" $UserNamesFile
      $ProcessedCount=0
-     $LicenseNames=Read-Host "Enter the license name(Eg:contoso:Enterprisepack)"
-     Write-Host Assigning license to users...
+     $LicenseNames=Read-Host "`nEnter the license name(Eg:contoso:Enterprisepack)"
+     Write-Host `nAssigning license to users...`n
      if((Get-MsolAccountSku).AccountSkuID -icontains $LicenseNames)
      {
       foreach($Item in $UserNames)
@@ -323,14 +350,14 @@ Function main()
 
   7 {
      $OutputCSVName="./Office365LicenseAssignment_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
-     $UserNamesFile=Read-Host "Enter the CSV file containing user names(Eg:D:/UserNames.csv)"
+     $UserNamesFile=Read-Host "`nEnter the CSV file containing user names(Eg:D:/UserNames.csv)"
     
      #We have an input file, read it into memory
      $UserNames=@()
      $UserNames=Import-Csv -Header "UPN" $UserNamesFile
      $Flag=""
      $ProcessedCount=0
-     $LicenseNames=Read-Host "Enter the license names(Eg:TenantName:LicensePlan1,TenantName:LicensePlan2)"
+     $LicenseNames=Read-Host "`nEnter the license names(Eg:TenantName:LicensePlan1,TenantName:LicensePlan2)"
      $LicenseNames=$LicenseNames.Replace(' ','')
      $LicenseNames=$LicenseNames.split(",")
      foreach($LicenseName in $LicenseNames)
@@ -343,11 +370,11 @@ Function main()
      }
      if($Flag -eq "Terminate")
      {
-      Write-Host Please re-run the script with appropriate license name -ForegroundColor Yellow
+      Write-Host `nPlease re-run the script with appropriate license name -ForegroundColor Yellow
      }
      else
      {
-      Write-Host Assigning licenses to Office 365 users...
+      Write-Host `nAssigning licenses to Office 365 users...`n
       foreach($Item in $UserNames)
       {
        $UPN=$Item.UPN
@@ -373,7 +400,7 @@ Function main()
        
 
   8 {
-     $Identity=Read-Host Enter User UPN
+     $Identity=Read-Host `nEnter User UPN
      $UserInfo=Get-MsolUser -UserPrincipalName $Identity
      #Checking whether the user is available
      if($UserInfo -eq $null)
@@ -385,13 +412,15 @@ Function main()
       $Licenses=$UserInfo.Licenses.AccountSkuID
       Write-Host Removing $Licenses license from $Identity
       Set-MsolUserLicense -UserPrincipalName $Identity -RemoveLicenses $Licenses
-      Write-Host Action completed -ForegroundColor Green
+      Write-Host `nAction completed -ForegroundColor Green
+	  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+      Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
      }  
     }
 
   9 {
      $OutputCSVName="./Office365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
-     $UserNamesFile=Read-Host "Enter the CSV file containing user names(Eg:D:/UserNames.csv)"
+     $UserNamesFile=Read-Host "`nEnter the CSV file containing user names(Eg:D:/UserNames.csv)"
     
      #We have an input file, read it into memory
      $UserNames=@()
@@ -411,9 +440,9 @@ Function main()
 
   10 {
       $OutputCSVName="./O365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
-      $License=Read-Host "Enter the license name(Eg:TenantName:LicensePlan)"
+      $License=Read-Host "`nEnter the license name(Eg:TenantName:LicensePlan)"
       $ProcessedCount=0
-      Write-Host Removing $License license from users...
+      Write-Host `nRemoving $License license from users...`n
       if((Get-MsolAccountSku).AccountSkuID -icontains $License)
       {
        Get-MsolUser -All | Where-Object {($_.licenses).AccountSkuId -eq $License} | foreach{
@@ -432,7 +461,7 @@ Function main()
 
   11 {
       $OutputCSVName="./O365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
-      Write-Host Removing license from disabled users...
+      Write-Host `nRemoving license from disabled users...`n
       $ProcessedCount=0
       Get-MsolUser -All -EnabledFilter DisabledOnly | where {$_.IsLicensed -eq $true} | foreach {
        $ProcessedCount++
@@ -459,10 +488,3 @@ Function main()
   Clear-Host
 }
 . main
-
-<#
-=============================================================================================
-Name: Office 365 license reporting and management using PowerShell
-For detailed Script execution: https://o365reports.com/2021/11/23/office-365-license-reporting-and-management-using-powershell
-============================================================================================
-#>
