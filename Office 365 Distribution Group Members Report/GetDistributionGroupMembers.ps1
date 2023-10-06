@@ -3,23 +3,6 @@
 Name:           Get distribution group members report
 Version:        3.0
 Website:        o365reports.com
-
-Script Highlights:
-~~~~~~~~~~~~~~~~~
-
-1.The script uses modern authentication to connect to Exchange Online.   
-2.Allows you to filter the report result based on group size(i.e., Members count).
-3.The script can be executed with MFA enabled account too.
-4.You can choose to either “Export Members of all Distribution Lists” or pass an input file to “Export Members of Specific Distribution List”.
-5.You can filter the output based on whether the group accepts message from external senders or not.
-6.Exports the list of allowed senders to a Distribution List.
-7.Output can be filtered to list Empty group. i.e., Distribution Group without members
-8.Exports the report result to CSV.
-9.You can get members count based on Member Type such as User mailbox, Group mailbox, Shared mailbox, Contact, etc.
-10.Automatically installs the EXO V2 (if not installed already) upon your confirmation.  
-11.The script is scheduler friendly. i.e., credentials can be passed as parameter instead of saving inside the script.
-12.Above all, script exports output in nicely formatted 2 CSV files. One with detailed information and another with summary information.
-
 For detailed script execution:  https://o365reports.com/2019/05/23/export-office-365-distribution-group-members-csv/
 ============================================================================================
 #>
@@ -241,12 +224,9 @@ Function main()
  Write-Host `nScript executed successfully
  if((Test-Path -Path $ExportCSV) -eq "True")
  {
-  Write-Host `n" Detailed report available in:" -NoNewline -ForegroundColor Yellow
-  Write-Host $ExportCSV `n
-  Write-host " Summary report available in:" -NoNewline -ForegroundColor Yellow
-  Write-Host $ExportSummaryCSV 
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
+  Write-Host Detailed report available in: $ExportCSV
+  Write-host Summary report available in: $ExportSummaryCSV
+  Write-Host `nCheck out """AdminDroid Office 365 Reporting tool""" to get access to 1500+ Office 365 reports.`n -ForegroundColor Green
   $Prompt = New-Object -ComObject wscript.shell  
   $UserInput = $Prompt.popup("Do you want to open output file?",`  
   0,"Open Output File",4)  

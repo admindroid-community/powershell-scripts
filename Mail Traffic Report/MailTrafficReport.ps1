@@ -4,18 +4,7 @@ Name:           Export Office 365 mail traffic statistics by user report
 Description:    This script exports mails sent, received, spam received and malware received statistics by users to CSV file
 Version:        3.0
 Website:        o365reports.com
-
-Script Highlights:   
-~~~~~~~~~~~~~~~~~
-1.The script can generate 5+ email statistics reports like emails sent, emails received, spam received, and malware received count.  
-2.The script uses modern authentication to connect to Exchange Online.   
-3.The script can be executed with MFA enabled account too.   
-4.Exports report results to CSV.   
-5.Allows you to generate email statistics reports for a custom period.   
-6.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.   
-7.Allows you to filter the mail traffic report for organization users alone.   
-8.The script is scheduler-friendly. i.e., Credentials can be passed as a parameter.  
-
+Script by:      O365Reports Team
 For detailed script execution: https://o365reports.com/2020/08/12/export-office-365-mail-traffic-report-with-powershell/
 ============================================================================================
 #>
@@ -225,7 +214,7 @@ else
 
 #Connect_Modules
 
-Write-Host Getting mail traffic data... `n
+Write-Host Getting mail traffic data...
 
 #Output file declaration
 $OutputCSV=".\Mail_Traffic_Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
@@ -280,10 +269,7 @@ Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction
 
 if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host " The Output file available in the current working directory with name:" -NoNewline -ForegroundColor Yellow; 
-  Write-Host $OutputCSV 
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+  Write-Host `nThe Output file available in the current working directory with name: $OutputCSV -ForegroundColor Green
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   

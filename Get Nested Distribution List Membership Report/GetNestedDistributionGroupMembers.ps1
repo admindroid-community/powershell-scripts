@@ -2,16 +2,8 @@
 =============================================================================================
 Name:           Export Office 365 nested distribution group members report
 Description:    This script exports Office 365 nested distribution list members to CSV file
-Website:        m365scripts.com
-
-Script Highlights:
-~~~~~~~~~~~~~~~~~
-1.The script uses modern authentication to connect to Exchange Online.
-2.The script can be executed with MFA enabled account.
-3.Primarily, the script exports nested distribution group members in two well-formatted CSV files – One with detailed information and another with summary information.
-4.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.
-5.The script is scheduler-friendly, so worry not! i.e., credentials can be passed as parameters rather than being saved inside the script.
-
+website:        m365scripts.com
+Script by:      m365scripts Team
 For detailed Script execution: https://m365scripts.com/exchange-online/export-office-365-nested-distribution-group-members-using-powershell/
 ============================================================================================
 #>
@@ -60,7 +52,7 @@ else
 
 
 #Get nested distribution group member
-Write-Host "Getting nested distribution groups and its members ...."`n
+Write-Host "Getting nested distribution groups and its members ...."
 $OutputCsv2=".\NestedDistributionGroupMembersSummaryList_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv"
 $OutputCsv1=".\NestedDistributionGroupMembersDetailInfo_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv"
 $DistributionGroupCount = 0
@@ -184,28 +176,26 @@ Get-DistributionGroup -ResultSize unlimited | ForEach-Object {
 #Open output file after execution 
 if($DistributionGroupCount -eq 0)
 {
- Write-Host "No distribution group found in this organization"`n
+ Write-Host "No distribution group found in this organization"
 }
 else
 {
- Write-Host "$DistributionGroupCount Distribution group found in this organization"`n
+ Write-Host "$DistributionGroupCount Distribution group found in this organization"
  if($Global:GroupWithNestedGroupCount -ne 0)
  {
-  Write-Host "$Global:GroupWithNestedGroupCount Distribution group found with nested group"`n
+  Write-Host "$Global:GroupWithNestedGroupCount Distribution group found with nested group"
   if((Test-Path -Path $OutputCsv1) -eq "True" -and (Test-Path -Path $OutputCsv2) -eq "True") 
   {
    Write-Host "The output files are available in the current working directory"
-   Write-Host `n "The Summary report name  :" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCsv2"
-   Write-Host `n "The Detailed report name :" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCsv1"
+   Write-Host "The Summary report name  : $OutputCsv2" -ForegroundColor Green 
+   Write-Host "The Detailed report name : $OutputCsv1" -ForegroundColor Green
    $Prompt = New-Object -ComObject wscript.shell    
    $UserInput = $Prompt.popup("Do you want to open output files?",` 0,"Open Output Files",4)    
    if ($UserInput -eq 6)    
    {    
     Invoke-Item "$OutputCSV1" 
     Invoke-Item "$OutputCSV2"   
-   } 
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+   }  
   } 
  }
  else

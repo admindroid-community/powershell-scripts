@@ -3,19 +3,8 @@
 Name:           Microsoft 365 Mailbox Size Report
 Description:    This script exports Microsoft 365 mailbox size report to CSV
 Version:        2.0
-Website:        o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-1.The script uses modern authentication to connect to Exchange Online.  
-2.The script can be executed with MFA enabled account too.  
-3.Exports report results to CSV. 
-4.You can choose to either “export mailbox size of all mailboxes” or pass an input file to “get usage statistics of specific mailboxes” alone. 
-5.Allows to use filter to get user mailboxes’ size alone 
-6.Allows to use filter to get shared mailboxes’ size alone. 
-7.Automatically installs the EXO (Exchange Online) V2 module (if not installed already) upon your confirmation. 
-8.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
-
+website:        o365reports.com
+Script by:      O365Reports Team
 For detailed Script execution: https://o365reports.com/2020/10/21/export-office-365-mailbox-size-report-using-powershell/
 ============================================================================================
 #>
@@ -174,10 +163,8 @@ Function main()
   Write-Host `nThe output file contains $PrintedMBCount mailboxes.
   if((Test-Path -Path $ExportCSV) -eq "True") 
   {
-
-   Write-Host `n The Output file available in: -NoNewline -ForegroundColor Yellow
-   Write-Host $ExportCSV 
-   $Prompt = New-Object -ComObject wscript.shell      
+   Write-Host `nThe Output file available in $ExportCSV -ForegroundColor Green
+   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
   If ($UserInput -eq 6)   
@@ -188,10 +175,6 @@ Function main()
  }
  #Disconnect Exchange Online session
  Disconnect-ExchangeOnline -Confirm:$false | Out-Null
- Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
- Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
- 
 }
- . main 
- 
+ . main
 

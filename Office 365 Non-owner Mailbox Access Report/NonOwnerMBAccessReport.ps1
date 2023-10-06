@@ -1,23 +1,4 @@
-﻿<#
-=============================================================================================
-Name:           Export Non-Owner Mailbox Access Report
-Version:        2.0
-Website:        o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~~
-
-1.Allows you to filter out external users’ access. 
-2.The script can be executed with MFA enabled account too. 
-3.Exports the report to CSV 
-4.This script is scheduler friendly. I.e., credentials can be passed as a parameter instead of saving inside the script. 
-5.You can narrow down the audit search for a specific date range. 
-
-For detailed script execution:  https://o365reports.com/2020/02/04/export-non-owner-mailbox-access-report-to-csv/
-============================================================================================
-#>
-
-Param
+﻿Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$MFA,
@@ -260,10 +241,7 @@ else
  Write-Host `nThe output file contains $NonOwnerAccess audit records
  if((Test-Path -Path $OutputCSV) -eq "True")
  {
-  Write-Host `nThe Output file available in: -NoNewline -ForegroundColor Yellow
-  Write-Host $OutputCSV 
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+  Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
   $Prompt = New-Object -ComObject wscript.shell
   $UserInput = $Prompt.popup("Do you want to open output file?",`
  0,"Open Output File",4)

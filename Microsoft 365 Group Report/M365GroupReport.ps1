@@ -3,17 +3,8 @@
 Name:           Microsoft 365 Group Report
 Description:    This script exports Microsoft 365 groups and their membership to CSV using Microsoft Graph PowerShell
 Version:        3.0
-Website:        o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-1.The script uses Microsoft Graph PowerShell.
-2.The script can be executed with certificate-based authentication (CBA) too.
-3.Exports the report result to CSV. 
-4.You can get members count based on Member Type such as User, Group, Contact, etc. 
-5.The script is scheduler friendly.
-6.Above all, the script exports output to nicely formatted 2 CSV files. One with group information and another with detailed group membership information. 
-
+website:        o365reports.com
+Script by:      O365Reports Team
 For detailed Script execution: https://o365reports.com/2021/02/11/export-microsoft-365-group-report-to-csv-using-powershell
 ============================================================================================
 #>
@@ -180,9 +171,9 @@ Function main()
         $confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No  
         if($confirm -match "[yY]") 
         { 
-            Write-host `n"Installing MicrosoftGraph module..."
+            Write-host "Installing MicrosoftGraph module..."
             Install-Module Microsoft.Graph -Repository PsGallery -Force -AllowClobber -Scope CurrentUser
-            Write-host `n"Required Module is installed in the machine Successfully" -ForegroundColor Magenta 
+            Write-host "Required Module is installed in the machine Successfully" -ForegroundColor Magenta 
         } 
         else
         { 
@@ -190,7 +181,7 @@ Function main()
             Exit 
         } 
     } 
-    Write-Host `n"Connecting to Microsoft Graph..."`n
+    Write-Host "Connecting to Microsoft Graph..." 
     $Scopes = @("Directory.Read.All"
     )  
     #Storing credential in script for scheduling purpose/ Passing credential as parameter
@@ -203,7 +194,7 @@ Function main()
         }
         catch
         {
-            Write-Host `n"Please provide Correct Details!" -ForegroundColor Red
+            Write-Host "Please provide Correct Details!" -ForegroundColor Red
             Exit
         }
     }  
@@ -211,7 +202,7 @@ Function main()
     {
         Connect-MgGraph -Scopes $Scopes
     } 
-    Write-Host `n"Microsoft Graph connected" -ForegroundColor Green
+    Write-Host "Microsoft graph connected" -ForegroundColor Green
     #Set output file 
     $ExportCSV=".\M365Group-DetailedMembersReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" #Detailed report
     $ExportSummaryCSV=".\M365Group-SummaryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" #Summary report
@@ -250,15 +241,11 @@ Function main()
     }
 
     #Open output file after execution 
-    Write-Host `n"Script executed successfully"
+    Write-Host "Script executed successfully" -ForegroundColor Green
     if((Test-Path -Path $ExportCSV) -eq "True")
     {
-        Write-Host `n" Detailed report available in:" -NoNewline -ForegroundColor Yellow
-		Write-Host $ExportCSV 
-        Write-host `n" Summary report available in:" -NoNewline -ForegroundColor Yellow
-		Write-Host $ExportSummaryCSV 
-		Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-        Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+        Write-Host Detailed report available in: $ExportCSV -ForegroundColor Magenta
+        Write-host Summary report available in: $ExportSummaryCSV -ForegroundColor Magenta
         $Prompt = New-Object -ComObject wscript.shell  
         $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)  
         If ($UserInput -eq 6)  
@@ -270,7 +257,7 @@ Function main()
     }
     Else
     {
-        Write-Host `n"No group found" -ForegroundColor Red
+        Write-Host "No group found" -ForegroundColor Red
         CloseConnection
     }
 }

@@ -4,21 +4,6 @@ Name:           Export Office 365 users real last activity time report
 Version:        3.0
 Website:        o365reports.com
 Script by:      O365Reports Team
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-
-1.Reports the user’s activity time based on the user’s last action time(LastUserActionTime). 
-2.Exports result to CSV file. 
-3.Result can be filtered based on inactive days. 
-4.You can filter the result based on user/mailbox type. 
-5.Result can be filtered to list never logged in mailboxes alone. 
-6.You can filter the result based on licensed user.
-7.Shows result with the user’s administrative roles in the Office 365. 
-8.The assigned licenses column will show you the user-friendly-name like ‘Office 365 Enterprise E3’ rather than ‘ENTERPRISEPACK’. 
-9.The script can be executed with MFA enabled account. 
-10.The script is scheduler friendly. i.e., credentials can be passed as a parameter instead of saving inside the script. 
-
 For detailed script execution:  https://o365reports.com/2019/06/18/export-office-365-users-real-last-logon-time-report-csv/#
 ============================================================================================
 #>
@@ -280,10 +265,7 @@ Function main()
  Write-Host `nScript executed successfully
  if((Test-Path -Path $ExportCSV) -eq "True")
  {
-  Write-Host `n" Detailed report available in:" -NoNewline -ForegroundColor Yellow
-  Write-Host $ExportCSV
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
+  Write-Host "Detailed report available in: $ExportCSV" 
   $Prompt = New-Object -ComObject wscript.shell  
   $UserInput = $Prompt.popup("Do you want to open output file?",`  
  0,"Open Output File",4)  
