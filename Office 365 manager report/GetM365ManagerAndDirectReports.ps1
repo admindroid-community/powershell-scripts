@@ -1,25 +1,3 @@
-<#
-=============================================================================================
-Name:           Export Office 365 User's Manager Report
-Description:    This script exports Office 365 users and their manager to CSV
-Version:        1.0
-Website:        o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-1.Generates 10+ different manager reports to view the managers and direct reports status.  
-2.Automatically installs the Azure AD module upon your confirmation when it is not available in your machine. 
-3.Shows list of all Azure AD users and their manager.  
-4.List of all Office 365 users with no manager. 
-5.Allows specifying user departments to get their manager details. 
-6.You can get the direct reports of the Office 365 managers. 
-7.Supports both MFA and Non-MFA accounts.    
-8.Exports the report in CSV format.  
-9.Scheduler-friendly. You can automate the report generation upon passing credentials as parameters. 
-
-For detailed Script execution: https://o365reports.com/2021/07/13/export-office-365-user-manager-and-direct-reports-using-powershell
-============================================================================================
-#>
 
 param (
     [string] $UserName = $null,
@@ -41,7 +19,7 @@ Function ConnectToAzureAD {
         if ($confirm -match "[yY]") { 
             Write-host "Installing AzureAD"
             Install-Module AzureAd -Allowclobber -Repository PSGallery -Force
-            Write-host `n"AzureAD module is installed in the system successfully."
+            Write-host "AzureAD module is installed in the system successfully."
         }
         else { 
             Write-host "Exiting. `nNote: AzureAD PowerShell module must be available in your system to run the script."  
@@ -59,8 +37,7 @@ Function ConnectToAzureAD {
     else {   
         Connect-AzureAD | Out-Null
     }
-    Write-Host `n"AzureAD PowerShell module is connected successfully"
-	Write-Host ""
+    Write-Host "AzureAD PowerShell module is connected successfully"
     #End of Connecting AzureAD
 }
 
@@ -100,13 +77,13 @@ Function FindUseCase {
     if ($UseCaseFilter -ne $null) { 
         #Filters the users to generate report
         $UseCaseFilter = [ScriptBlock]::Create($UseCaseFilter)
-        Get-AzureADUser -All $true | Where-Object $UseCaseFilter | foreach-object {
+        Get-AzureADUser | Where-Object $UseCaseFilter | foreach-object {
             $CurrUserData = $_
             ProcessUserData
         }
     } else { 
         #No Filter- Gets all the users without any filter
-        Get-AzureADUser -All $true | foreach-object {
+        Get-AzureADUser | foreach-object {
             $CurrUserData = $_
             ProcessUserData
         }
@@ -245,8 +222,7 @@ FindUseCase
 
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
     #Open file after code execution finishes
-    Write-Host "The output file available in:" -NoNewline -ForegroundColor Yellow
-	Write-Host .\$global:ExportCSVFileName `n
+    Write-Host "The output file available in $global:ExportCSVFileName" -ForegroundColor Green 
     write-host "Exported $global:ExportedUser records to CSV." 
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)    
@@ -255,10 +231,8 @@ if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {
     }  
 } else {
     #Notification when usecase doesn't have the data in the tenant
-    Write-Host `n"No data found with the specified criteria"
+    Write-Host "No data found with the specified criteria"
 }
 Write-Host `nFor more Microsoft 365 reports"," please check o365reports.com -ForegroundColor Cyan
 Disconnect-AzureAD
 Write-host "`nDisconnected AzureAD Session Successfully"
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n

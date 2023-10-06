@@ -1,31 +1,12 @@
-﻿<#
-=============================================================================================
-Name:           Get Shared Mailbox Permission Report 
-Version:        2.0
-Website:        o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~~
-
-1.The script display only “Explicitly assigned permissions” to mailboxes which means it will ignore “SELF” permission that each user on his mailbox and inherited permission. 
-2.Exports output to CSV file. 
-3.The script can be executed with MFA enabled account also. 
-4.You can choose to either “export permissions of all mailboxes” or pass an input file to get permissions of specific mailboxes alone. 
-5.Allows you to filter output using your desired permissions like Send-as, Send-on-behalf or Full access. 
-6.This script is scheduler friendly. I.e., credentials can be passed as a parameter instead of saving inside the script 
-
-For detailed script execution:  https://o365reports.com/2020/01/03/shared-mailbox-permission-report-to-csv/
-============================================================================================
-#>
-
-#Accept input paramenters
+﻿#Accept input paramenters
 param(
 [switch]$FullAccess,
 [switch]$SendAs,
 [switch]$SendOnBehalf,
 [string]$MBNamesFile,
 [string]$UserName,
-[string]$Password
+[string]$Password,
+[switch]$MFA
 )
 
 
@@ -129,35 +110,68 @@ function Get_MBPermission
 }
 
 function main{
-  #Check for Exchange Online management module inatallation
- $Module = Get-Module ExchangeOnlineManagement -ListAvailable
- if($Module.count -eq 0) 
- { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
-  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
-  if($Confirm -match "[yY]") 
-  { 
-   Write-host "Installing Exchange Online PowerShell module"
-   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
-   Import-Module ExchangeOnlineManagement
-  } 
-  else 
-  { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
-   Exit
-  }
- } 
- Write-Host Connecting to Exchange Online...
- #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
- if(($UserName -ne "") -and ($Password -ne ""))
+ #Connect AzureAD and Exchange Online from PowerShell
+ Get-PSSession | Remove-PSSession
+
+ #Authentication using MFA
+ if($MFA.IsPresent)
  {
-  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
-  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-  Connect-ExchangeOnline -Credential $Credential
+  $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
+  If ($MFAExchangeModule -eq $null)
+  {
+   Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow
+   Write-Host You can install module using below blog :https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/ `n `nOR you can install module directly by entering "Y"`n
+   $Confirm= Read-Host Are you sure you want to install module directly? [Y] Yes [N] No
+   if($Confirm -match "[y]")
+   {
+    Write-Host Yes
+    Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
+   }
+   else
+   {
+    Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
+    Exit
+   }
+   $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
+
+   if($Confirmation -match "[y]")
+   {
+    $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
+    If ($MFAExchangeModule -eq $null)
+    {
+     Write-Host Exchange Online MFA module is not available -ForegroundColor red
+     Exit
+    }
+   }
+   else
+   {
+    Write-Host Exchange Online PowerShell Module is required
+    Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
+    Exit
+   }
+  }
+
+  #Importing Exchange MFA Module
+  . "$MFAExchangeModule"
+  Connect-EXOPSSession -WarningAction SilentlyContinue
+  Write-Host `nReport generation in progress...
  }
+
+ #Authentication using non-MFA
  else
  {
-  Connect-ExchangeOnline
+  #Storing credential in script for scheduling purpose/ Passing credential as parameter
+  if(($UserName -ne "") -and ($Password -ne ""))
+  {
+   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  }
+  else
+  {
+   $Credential=Get-Credential -Credential $null
+  }
+  $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection
+  Import-PSSession $Session -CommandName Get-Mailbox,Get-MailboxPermission,Get-RecipientPermission -FormatTypeName * -AllowClobber | Out-Null
  }
 
  #Set output file
@@ -205,11 +219,7 @@ function main{
  Write-Host `nScript executed successfully
  if((Test-Path -Path $ExportCSV) -eq "True")
  {
-  Write-Host ""
-  Write-Host " Detailed report available in:" -NoNewline -ForegroundColor Yellow
-  Write-Host $ExportCSV
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
+  Write-Host "Detailed report available in: $ExportCSV"  -ForegroundColor Green
   $Prompt = New-Object -ComObject wscript.shell
   $UserInput = $Prompt.popup("Do you want to open output file?",`
  0,"Open Output File",4)

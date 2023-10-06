@@ -3,18 +3,6 @@
 Name:           Remove email forwarding in Office 365
 Version:        1.0
 Website:        m365scripts.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-1.The script uses modern authentication to connect to Exchange Online. 
-2.The script can be executed with MFA enabled account too.  
-3.Exports the report result to a CSV file.  
-4.Removes email forwarding configurations as well as disables the inbox rule with email forwarding. 
-5.Removes forwarding from a specific user. 
-6.Disables email forwarding for a list of users through input CSV. 
-7.Automatically installs the EXO V2 module (if not installed already) upon your confirmation. 
-8.Credentials are passed as parameters (scheduler-friendly). 
-
 For detailed script execution:  https://m365scripts.com/exchange-online/remove-email-forwarding-in-office-365-using-powershell/
 ============================================================================================
 #>
@@ -179,7 +167,7 @@ if (((Test-Path -Path $global:ExportCSVFileName1) -ne "True") -and ((Test-Path -
 else {
     if ((Test-Path -Path $global:ExportCSVFileName1) -eq "True") {
         if ((Test-Path -Path $global:ExportCSVFileName2) -eq "True") {
-            Write-Host `n "Following output files are generated and avaialble in the current directory:" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCsv2"`n
+            Write-Host "Following output files are generated and avaialble in the current directory" -ForegroundColor green
             Write-Host "$global:ExportCSVFileName1 , $global:ExportCSVFileName2" -ForegroundColor Cyan
             Write-Host "The log file available in $global:logfile" -ForegroundColor Green
             $prompt = New-Object -ComObject wscript.shell    
@@ -191,20 +179,18 @@ else {
             }
         }
         else {
-            Write-Host `n "The Output file available in: " -NoNewline -ForegroundColor Yellow; Write-Host "$global:ExportCSVFileName1"
-			Write-Host `n "The log file available in: " -NoNewline -ForegroundColor Yellow; Write-Host "$global:logfile" 
+            Write-Host "The output file $global:ExportCSVFileName1 is available in  the current directory" -ForegroundColor Green
+            Write-Host "The log file available in $global:logfile" -ForegroundColor Green
             $prompt = New-Object -ComObject wscript.shell    
             $userInput = $prompt.popup("Do you want to open output files?", 0, "Open Output File", 4)    
             if ($userInput -eq 6) {    
                 Invoke-Item "$global:ExportCSVFileName1"
                 Invoke-Item "$global:logfile"
             }
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
         }
     }
     else {
-        Write-Host `n "The output file $global:ExportCSVFileName2 is available in  the current directory:" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCsv2"`n
+        Write-Host "The output file $global:ExportCSVFileName2 is available in  the current directory" -ForegroundColor Green
         if ((Test-Path -Path $global:logfile) -eq "True") {
             Write-Host "The log file available in $global:logfile" -ForegroundColor Green
             $prompt = New-Object -ComObject wscript.shell    
@@ -220,8 +206,6 @@ Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admind
             if ($userInput -eq 6) {
                 Invoke-Item "$global:ExportCSVFileName2"
             }
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
         }
     }
 }

@@ -4,16 +4,6 @@ Name:           Get storage used by Office 365 groups
 Description:    This script find Office 365 groups' size and exports the report to CSV file
 Version:        1.0
 Website:        o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-1. The script uses modern authentication to connect to Exchange Online.  
-2. The script can be executed with MFA enabled account too. 
-3. Automatically install the EXO V2 and SharePoint PnP PowerShell module (if not installed already) upon your confirmation.  
-4. Credentials are passed as parameters (Scheduler-friendly), so worry not! i.e., credentials can be passed as parameters rather than being saved inside the script.  
-5. Exports the report result to a CSV file. 
-6. Lists the details of the storage used in each Office 365 group. 
-
 For detailed script execution: https://o365reports.com/2022/05/18/get-the-storage-used-by-office-365-groups-using-powershell/
 ============================================================================================
 #>
@@ -104,7 +94,7 @@ else
 
 
 #Get storage used by office 365 groups...
-Write-Host "Getting office 365 groups storage..."`n
+Write-Host "Getting office 365 groups storage..."
 $OutputCsv=".\Office365GroupsStorageSizeReport_$((Get-Date -format MMM-dd` hh-mm` tt).ToString()).csv"
 #Getting all sites which have an underlying Microsoft 365 group
 $GroupSites = Get-PnPTenantSite -GroupIdDefined $true | Select-Object StorageUsageCurrent, StorageQuota, Url  
@@ -132,7 +122,7 @@ Get-UnifiedGroup -ResultSize unlimited | ForEach-Object {
 #Groupcount details
 if($GroupCount -ne 0)
 {
- Write-Host "$GroupCount Office 365 groups found in this organization."`n
+ Write-Host "$GroupCount Office 365 groups found in this organization"
 }
 else
 {
@@ -143,10 +133,7 @@ else
 #Open output file after execution 
 if((Test-Path -Path $OutputCsv) -eq "True") 
 { 
-  Write-Host " The office 365 groups storage report available in:" -NoNewline -ForegroundColor Yellow; Write-Host $OutputCsv 
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
-  Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+  Write-Host "The office 365 groups storage report available in : $OutputCsv" -ForegroundColor Green 
   $Prompt = New-Object -ComObject wscript.shell    
   $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)    
   If ($UserInput -eq 6)    

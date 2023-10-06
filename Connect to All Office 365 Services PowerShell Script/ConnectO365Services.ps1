@@ -1,26 +1,10 @@
-﻿<#
-=============================================================================================
-Name:           Connect to all the Office 365 services using PowerShell
-Description:    This script automatically installs all the required modules(upon your confirmation) and connects to the services
-Version:        3.5
-Website:        o365reports.com
-
-1.Installs Office 365 PowerShell modules. ie, Modules required for Office 365 services are automatically downloaded and installed upon your confirmation.
-2.You can connect to one or more Office 365 services via PowerShell using a single cmdlet. 
-3.You can connect to Office 365 services with MFA enabled account. 
-4.For non-MFA account, you don’t need to enter credential for each service. You’ll be asked to enter your credential only once! 
-5.The script is scheduler friendly. i.e., credentials can be passed as a parameter instead of saving inside the script. 
-6.You can disconnect all service connections using a single cmdlet. 
-
-For detailed script execution: https://o365reports.com/2019/10/05/connect-all-office-365-services-powershell/
-============================================================================================
-#>
+﻿
 Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$Disconnect,
-    [ValidateSet('MSOnline','AzureAD','ExchangeOnline','SharePoint','SharePointPnP','SecAndCompCenter','Teams')]
-    [string[]]$Services=("MSOnline","AzureAD","ExchangeOnline",'SharePoint','SharePointPnP','SecAndCompCenter','Teams'),
+    [ValidateSet('AzureAD','MSOnline','ExchangeOnline','SharePoint','SharePointPnP','SecAndCompCenter','Skype','Teams')]
+    [string[]]$Services=("AzureAD","MSOnline","ExchangeOnline",'SharePoint','SharePointPnP','SecAndCompCenter','Skype','Teams'),
     [string]$SharePointHostName,
     [Switch]$MFA,
     [string]$UserName, 
@@ -53,7 +37,7 @@ else
   $Credential=Get-Credential -Credential $null
  } 
  $ConnectedServices=""
- if($Services.Length -eq 7)
+ if($Services.Length -eq 8)
  {
   $RequiredServices=$Services  
  }
@@ -227,7 +211,7 @@ else
      {
       $ConnectedServices=$ConnectedServices+","
      }
-     $ConnectedServices=$ConnectedServices+" SharePoint Online"
+     $ConnectedServices=$ConnectedServices+"SharePoint Online"
     }
    }
 
@@ -271,7 +255,47 @@ else
      {
       $ConnectedServices=$ConnectedServices+","
      }
-     $ConnectedServices=$ConnectedServices+" SharePoint PnP"  
+     $ConnectedServices=$ConnectedServices+"SharePoint PnP"  
+    }
+   }
+
+
+   #Module and Connection settings for Skype for Business Online module
+   Skype
+   { 
+    $Module=Get-InstalledModule -Name MicrosoftTeams -MinimumVersion 1.1.6 
+    if($Module.count -eq 0)
+    {
+     Write-Host Required MicrosoftTeams module is not available  -ForegroundColor yellow 
+     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
+     if($Confirm -match "[yY]")
+     {
+      Install-Module MicrosoftTeams -AllowClobber
+     }
+     else
+     {
+      Write-Host MicrosoftTeams module is required.Please install module using Install-Module MicrosoftTeams cmdlet.
+     }
+     Continue
+    }
+    if($MFA.IsPresent)
+    {
+     $sfbSession = New-CsOnlineSession
+     Import-PSSession $sfbSession -AllowClobber | Out-Null
+    }
+    else
+    {
+     $sfbSession = New-CsOnlineSession -Credential $Credential
+     Import-PSSession $sfbSession -AllowClobber -WarningAction SilentlyContinue | Out-Null
+    }
+    #Check for Skype connectivity
+    If ((Get-PSSession | Where-Object { $_.ConfigurationName -like "Microsoft.PowerShell" }) -ne $null)
+    {
+     if($ConnectedServices -ne "")
+     {
+      $ConnectedServices=$ConnectedServices+","
+     }
+     $ConnectedServices=$ConnectedServices+"Skype"  
     }
    }
 
@@ -314,16 +338,16 @@ else
    }
   
    #Module and Connection settings for Teams Online module
-  Teams
+   Teams
    {
-    $Module=Get-InstalledModule -Name MicrosoftTeams -MinimumVersion 4.0.0 
+    $Module=Get-InstalledModule -Name MicrosoftTeams -MinimumVersion 1.1.6 
     if($Module.count -eq 0)
     {
      Write-Host Required MicrosoftTeams module is not available  -ForegroundColor yellow 
      $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
      if($Confirm -match "[yY]")
      {
-      Install-Module MicrosoftTeams -AllowClobber -Force
+      Install-Module MicrosoftTeams -AllowClobber
      }
      else
      {
@@ -346,7 +370,7 @@ else
      {
       $ConnectedServices=$ConnectedServices+","
      }
-     $ConnectedServices=$ConnectedServices+" Teams"
+     $ConnectedServices=$ConnectedServices+"Teams"
     }
    }
   }
@@ -355,7 +379,5 @@ else
  {
   $ConnectedServices="-"
  }
- Write-Host `n`nConnected Services - $ConnectedServices -ForegroundColor DarkYellow 
- Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
- Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+ Write-Host `n`nConnected Services $ConnectedServices -ForegroundColor DarkYellow 
 }

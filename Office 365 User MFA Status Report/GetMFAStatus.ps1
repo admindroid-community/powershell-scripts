@@ -1,28 +1,4 @@
-﻿<#
-=============================================================================================
-Name:           Export Office 365 MFA status report
-Description:    This script exports Microsoft 365 MFA status report to CSV
-Version:        2.2
-website:        o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-
-1.The result can be filtered based on MFA status. i.e., you can filter MFA enabled users/enforced users/disabled users alone. For example using the ‘EnabledOnly‘ flag you shall export Office 365 users’ MFA enabled status to CSV file.
-2.Exports result to CSV file. 
-3.Result can be filtered based on Admin users.
-4.You can filter result to display Licensed users alone.
-5.You can filter result based on SignIn Status (SignIn allowed/denied).
-6.The script produces different output files based on MFA status. 
-7.You can use this script to get users’ MFA status set by Conditional Access.
-8.The script can be executed with MFA enabled account. 
-9.Using the ‘Admin Roles’ column, you can find users with admin roles that are not protected with MFA. For example, you can find Global Admins without MFA.
-10.The script is scheduler friendly. i.e., credentials can be passed as parameter instead of saving inside the script. 
-
-For detailed Script execution: https://o365reports.com/2019/05/09/export-office-365-users-mfa-status-csv
-============================================================================================
-#>
-Param
+﻿Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$DisabledOnly,
@@ -215,11 +191,9 @@ Get-MsolUser -All | foreach{
 
 #Open output file after execution
 Write-Host `nScript executed successfully
-
 if((Test-Path -Path $ExportCSV) -eq "True")
 {
- Write-Host " MFA Disabled user report available in:" -NoNewline -ForegroundColor Yellow
- Write-Host $ExportCSV `n 
+ Write-Host "MFA Disabled user report available in: $ExportCSV"
  $Prompt = New-Object -ComObject wscript.shell
  $UserInput = $Prompt.popup("Do you want to open output file?",`
  0,"Open Output File",4)
@@ -231,9 +205,7 @@ if((Test-Path -Path $ExportCSV) -eq "True")
 }
 elseif((Test-Path -Path $ExportCSVReport) -eq "True")
 {
- Write-Host ""
- Write-Host " MFA Enabled user report available in:" -NoNewline -ForegroundColor Yellow
- Write-Host $ExportCSVReport `n
+ Write-Host "MFA Enabled user report available in: $ExportCSVReport"
  $Prompt = New-Object -ComObject wscript.shell
  $UserInput = $Prompt.popup("Do you want to open output file?",`
  0,"Open Output File",4)
@@ -241,15 +213,11 @@ elseif((Test-Path -Path $ExportCSVReport) -eq "True")
  {
   Invoke-Item "$ExportCSVReport"
  }
- Write-Host Exported report has $PrintedUser users  
- Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
- Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n `n 
+ Write-Host Exported report has $PrintedUser users
 }
 Else
 {
-  Write-Host No user found that matches your criteria. 
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n `n 
+  Write-Host No user found that matches your criteria.
 }
 #Clean up session
 Get-PSSession | Remove-PSSession

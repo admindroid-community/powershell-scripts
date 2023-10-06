@@ -4,16 +4,6 @@ Name:           List all Exchange Online mailboxes users can access
 Version:        1.0
 Website:        m365scripts.com
 Script by:      M365Scripts Team
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~
-1.Exports mailbox rights for all users by default.
-2.Allows to generate mailbox rights report for a list of users through input CSV.
-3.List mailboxes the users have Send As/Send On Behalf/Full Access permissions.
-4.The script can also be executed with MFA enabled account also. 
-5.Export report results to CSV file.
-6.The script is scheduler-friendly. i.e., credentials are passed as parameters, so worry not!
-
 For detailed script execution: https://m365scripts.com/exchange-online/URL Sluglist-exchange-online-mailboxes-user-has-access-using-powershell
 ============================================================================================
 #>
@@ -160,7 +150,7 @@ else {
     }
 }
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
-    Write-Host `n "The Output file availble in: " -NoNewline -ForegroundColor Yellow; Write-Host "`"$global:ExportCSVFileName`""`n
+    Write-Host "The Output file availble in `"$global:ExportCSVFileName`"" -ForegroundColor Green 
     $prompt = New-Object -ComObject wscript.shell    
     $userInput = $prompt.popup("Do you want to open output files?", 0, "Open Output File", 4)    
     if ($userInput -eq 6) {    
@@ -169,5 +159,3 @@ if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {
 }
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
 Write-Host "Disconnected active ExchangeOnline session"
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
