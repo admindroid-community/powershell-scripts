@@ -5,6 +5,16 @@ Description:    This script exports SharePoint Online external user file access 
 Version:        1.0
 Website:        o365reports.com
 Script by:      O365Reports Team
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to connect to Exchange Online.   
+2.The script can be executed with MFA enabled account too.   
+3.Exports report results to CSV file.   
+4.Allows you to generate an external file access report for a custom period.   
+5.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.  
+6.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
 For detailed script execution: https://o365reports.com/2021/03/23/audit-external-user-file-access-in-sharepoint-online-using-powershell
 ============================================================================================
 #>
@@ -213,7 +223,10 @@ else
  Write-Host `nThe output file contains $AggregateResultCount audit records
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file availble in $OutputCSV -ForegroundColor Green
+  Write-Host `n The Output file availble in: -NoNewline -ForegroundColor Yellow
+  Write-Host $OutputCSV 
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
