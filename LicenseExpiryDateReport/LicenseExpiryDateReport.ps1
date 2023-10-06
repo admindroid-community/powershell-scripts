@@ -1,4 +1,24 @@
-﻿Param 
+﻿<#
+=============================================================================================
+Name:           Get License Expiry Date report
+Version:        2.0
+Website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~~
+
+1.Exports Office 365 license expiry date with ‘next lifecycle activity date’. 
+2.Exports report to the CSV file. 
+3.Result can be filtered based on subscription type like Purchased, Trial and Free subscription 
+4.Result can be filtered based on subscription status like Enabled, Expired, Disabled, etc. 
+5.Subscription name is shown as user-friendly-name like ‘Office 365 Enterprise E3’ rather than ‘ENTERPRISEPACK’. 
+6.The script can be executed with MFA enabled account too. 
+7.The script is scheduler friendly. i.e., credentials can be passed as a parameter instead of saving inside the script. 
+
+For detailed script execution:  https://o365reports.com/2020/03/04/export-office-365-license-expiry-date-report-powershell/
+============================================================================================
+#>
+Param 
 ( 
     [Parameter(Mandatory = $false)] 
     [switch]$Trial, 
@@ -181,8 +201,14 @@ $Subscriptions= Get-MsolSubscription | foreach{
 #Open output file after execution 
 if((Test-Path -Path $ExportCSV) -eq "True") 
 {
- Write-Host `nOffice 365 license expiry report available in: $ExportCSV -ForegroundColor Green 
- Write-Host `nThe Output file contains $PrintedOutput subscriptions
+ Write-Host ""
+ Write-Host " Office 365 license expiry report available in:"  -NoNewline -ForegroundColor Yellow
+ Write-Host $ExportCSV 
+ Write-Host ""
+ Write-Host " The Output file contains:" -NoNewline -ForegroundColor Yellow
+ Write-Host $PrintedOutput subscriptions  
+ Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
  $Prompt = New-Object -ComObject wscript.shell 
  $UserInput = $Prompt.popup("Do you want to open output files?",` 
  0,"Open Files",4) 

@@ -3,7 +3,17 @@
 Name:           Export all shared mailboxes in Office 365
 Version:        1.0
 Website:        o365reports.com
-Script by:      O365Reports Team
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+1.The script uses modern authentication to connect to Exchange Online.    
+2.The script can be executed with an MFA-enabled account too.    
+3.Exports report results to CSV file.    
+4.It helps to identify shared mailboxes with licenses separately.  
+5.Helps to track email forwarding configured shared mailboxes. 
+6.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.   
+7.The script is scheduler-friendly. I.e., Credentials can be passed as a parameter instead of getting interactively.
+
 For detailed script execution:  https://o365reports.com/2022/07/13/get-shared-mailbox-in-office-365-using-powershell
 ============================================================================================
 #>Param
@@ -113,14 +123,16 @@ else
  Write-Host `nThe output file contains $OutputCount shared mailboxes.
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
-  Write-Host `nThe Output file available in $OutputCSV -ForegroundColor Green
+  Write-Host `n "The Output file available in:" -NoNewline -ForegroundColor Yellow; Write-Host "$OutputCSV"`n 
   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
   If ($UserInput -eq 6)   
   {   
    Invoke-Item "$OutputCSV"   
-  } 
+  }
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
  }
 }
 
