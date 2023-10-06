@@ -1,4 +1,25 @@
-﻿#Accept input paramenters 
+﻿<#
+=============================================================================================
+Name:           Export Microsoft Teams report
+Description:    This script exports Microsoft Teams report to CSV
+Version:        2.0
+website:        o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~
+
+1.A single script allows you to generate eight different Teams reports.  
+2.The script can be executed with MFA enabled accounts too. 
+3.Exports output to CSV. 
+4.Automatically installs Microsoft Teams PowerShell module (if not installed already) upon your confirmation. 
+5.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+
+
+For detailed Script execution: https://o365reports.com/2020/05/28/microsoft-teams-reporting-using-powershell/
+============================================================================================
+#>
+
+#Accept input paramenters 
 param(
 [string]$UserName, 
 [string]$Password, 
@@ -80,6 +101,8 @@ Do {
  Write-Host `nPrivate Channel Management and Reporting -ForegroundColor Yellow
  Write-Host  "    You can download the script from https://blog.admindroid.com/managing-private-channels-in-microsoft-teams/" -ForegroundColor Cyan
  Write-Host ""
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
  $i = Read-Host 'Please choose the action to continue' 
  }
  else
@@ -286,7 +309,11 @@ Do {
       }   
       if((Test-Path -Path $Path) -eq "True") 
       {
-       Write-Host `nReport available in $Path -ForegroundColor Green
+	   Write-Host ""
+       Write-Host "Report available in:"  -NoNewline -ForegroundColor Yellow
+	   Write-Host $Path 
+	   Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
       }
      }
 
