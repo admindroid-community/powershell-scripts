@@ -3,6 +3,23 @@
 Name:           Export Mailbox Permission Report
 Website:        o365reports.com
 Version:        3.0
+
+Script Highlights :
+~~~~~~~~~~~~~~~~~
+
+1. The script uses Modern authentication to connect to Exchange Online.
+2. The script display only “Explicitly assigned permissions” to mailboxes which means it will ignore “SELF” permission that each user on his mailbox and inherited permission.
+3. Exports output to CSV file.
+4. The script can be executed with MFA enabled account too.
+5. The script supports certificate based authentication (CBA) too.
+6. You can choose to either “export permissions of all mailboxes” or pass an input file to get permissions of specific mailboxes alone.
+7. Allows you to filter output using your desired permissions like Send-as, Send-on-behalf or Full access.
+8. Output can be filtered based on user/all mailbox type
+9. Allows you to filter permissions on admin’s mailbox. So that you can view administrative users’ mailbox permission alone.
+10. Automatically installs the EXO V2 and MS Graph PowerShell modules (if not installed already) upon your confirmation. 
+11. This script is scheduler friendly.
+
+
 For detailed Script execution: https://o365reports.com/2019/03/07/export-mailbox-permission-csv/
 ============================================================================================
 #>
@@ -23,39 +40,22 @@ param(
 
 Function ConnectModules 
 {
-    $MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable 
-    if($MsGraphModule -eq $null)
+    $MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+    if($MsGraphBetaModule -eq $null)
     { 
-        Write-host "Important: Microsoft Graph Powershell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." -ForegroundColor Yellow
-        $confirm = Read-Host Are you sure you want to install Microsoft Graph Powershell module? [Y] Yes [N] No  
+        Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+        $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
         if($confirm -match "[yY]") 
         { 
-            Write-host "Installing Microsoft Graph Powershell module..."
-            Install-Module -Name Microsoft.Graph -Scope CurrentUser
-            Write-host "Microsoft Graph Powershell module is installed in the machine successfully" -ForegroundColor Magenta 
+            Write-host "Installing Microsoft Graph Beta module..."
+            Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+            Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
         } 
         else
         { 
-            Write-host "Exiting. `nNote: Microsoft Graph Powershell module must be available in your system to run the script" -ForegroundColor Red
+            Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
             Exit 
         } 
-    }
-    else
-    {
-        [Version]$InstalledVersion = (Get-InstalledModule Microsoft.Graph).Version
-        $Result = $InstalledVersion.CompareTo([Version]"1.10.0")
-        if($Result -eq -1)
-        {
-            $Confirm = Read-Host "The installed version of the Microsoft Graph Powershell module is not supported. Do you want to update the module? [Y] Yes [N] No"
-            if($confirm -match "[yY]") 
-            { 
-                Update-Module -Name Microsoft.Graph 
-            } 
-            else
-            { 
-                Exit 
-            }
-        }
     }
     $ExchangeOnlineModule =  Get-Module ExchangeOnlineManagement -ListAvailable
     if($ExchangeOnlineModule -eq $null)
@@ -110,7 +110,7 @@ Function ConnectModules
         Write-Host $_.Exception.message -ForegroundColor Red
         Exit
     }
-    Write-Host "Microsoft Graph Powershell module is connected successfully" -ForegroundColor Cyan
+    Write-Host "Microsoft Graph Beta PowerShell module is connected successfully" -ForegroundColor Cyan
     Write-Host "Exchange Online module is connected successfully" -ForegroundColor Cyan
 }
 Function Print_Output
@@ -173,7 +173,7 @@ Function Get_MailBoxData
         return
     }
     #Get admin roles assigned to user 
-    $RoleList=Get-MgUserTransitiveMemberOf -UserId $UserId|Select-Object -ExpandProperty AdditionalProperties
+    $RoleList=Get-MgBetaUserTransitiveMemberOf -UserId $UPN|Select-Object -ExpandProperty AdditionalProperties
     $RoleList = $RoleList|?{$_.'@odata.type' -eq '#microsoft.graph.directoryRole'}
     $Roles = @($RoleList.displayName) -join ','
     if($RoleList.count -eq 0)
@@ -194,13 +194,14 @@ Function CloseConnection
     Disconnect-ExchangeOnline -Confirm:$false
 }
 ConnectModules
+Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh PowerShell window." -ForegroundColor Yellow
+
 Write-Progress -Activity Completed -Completed
-Select-MgProfile -Name beta
 #Set output file
 $Location = (Get-Location)
 $ExportCSV =  "$($Location)\MBPermission_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm-ss` tt).ToString()).csv"
 $Result = "" ; $Mailboxes = @(); $MBUserCount = 1;
-$Users = Get-MgUser -All
+$Users = Get-MgBetaUser -All
 #Check for AccessType filter
 if(($FullAccess.IsPresent) -or ($SendAs.IsPresent) -or ($SendOnBehalf.IsPresent))
 {
@@ -233,7 +234,6 @@ if ($MBNamesFile -ne "")
         }
         $DisplayName = $MailBox.DisplayName
         $UPN = $MailBox.UserPrincipalName
-        $UserId = $MailBox.ExternalDirectoryObjectId
         $MBType = $MailBox.RecipientTypeDetails
         $SendOnBehalfPermissions = $MailBox.GrantSendOnBehalfTo
         Get_MailBoxData
@@ -244,7 +244,6 @@ else
     Get-EXOMailbox -ResultSize Unlimited -PropertySets All | Where{$_.DisplayName -notlike "Discovery Search Mailbox"} |ForEach-Object{
         $DisplayName = $_.DisplayName
         $UPN = $_.UserPrincipalName
-        $UserId = $_.ExternalDirectoryObjectId
         $MBType = $_.RecipientTypeDetails
         $SendOnBehalfPermissions = $_.GrantSendOnBehalfTo   
         Get_MailBoxData
@@ -254,7 +253,7 @@ else
 Write-Host `nScript executed successfully
 if((Test-Path -Path $ExportCSV) -eq "True")
 {
-    Write-Host Detailed report available in: $ExportCSV -ForegroundColor Green 
+    Write-Host Detailed report available in: -NoNewline -Foregroundcolor Yellow; Write-Host " $ExportCSV" 
     $Prompt = New-Object -ComObject wscript.shell  
     $UserInput = $Prompt.popup("Do you want to open output file?",`  0,"Open Output File",4)  
     if ($UserInput -eq 6)  
@@ -266,4 +265,6 @@ else
 {
     Write-Host No mailbox found that matches your criteria. -ForegroundColor Red
 }
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
 CloseConnection
