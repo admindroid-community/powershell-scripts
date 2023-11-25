@@ -12,6 +12,7 @@ Script Highlights:
 3.Exports the report to CSV 
 4.This script is scheduler friendly. I.e., credentials can be passed as a parameter instead of saving inside the script. 
 5.You can narrow down the audit search for a specific date range. 
+6.The script supports Certificate-based authentication too.
 
 For detailed script execution:  https://o365reports.com/2020/02/04/export-non-owner-mailbox-access-report-to-csv/
 ============================================================================================
@@ -20,10 +21,12 @@ For detailed script execution:  https://o365reports.com/2020/02/04/export-non-ow
 Param
 (
     [Parameter(Mandatory = $false)]
-    [switch]$MFA,
     [Boolean]$IncludeExternalAccess=$false,
     [Nullable[DateTime]]$StartDate,
     [Nullable[DateTime]]$EndDate,
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint,
     [string]$UserName,
     [string]$Password
 )
@@ -56,64 +59,43 @@ else
 }
 
 
-#Authentication using MFA
-if($MFA.IsPresent)
+Function Connect_Exo
 {
- $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
- If ($MFAExchangeModule -eq $null)
- {
-  Write-Host  `nPlease install Exchange Online MFA Module.  -ForegroundColor yellow
-  Write-Host You can manually install module using below blog : `nhttps://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/ `nOR you can install module directly by entering "Y"`n
-  $Confirm= Read-Host `nAre you sure you want to install module directly? [Y] Yes [N] No
-  if($Confirm -match "[Y]")
-  {
-   Start-Process "iexplore.exe" "https://cmdletpswmodule.blob.core.windows.net/exopsmodule/Microsoft.Online.CSE.PSModule.Client.application"
-  }
-  else
-  {
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
+ #Check for EXO module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host Exchange Online PowerShell  module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+  } 
+  else 
+  { 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
-  $Confirmation= Read-Host Have you installed Exchange Online MFA Module? [Y] Yes [N] No
-  if($Confirmation -match "[yY]")
-  {
-   $MFAExchangeModule = ((Get-ChildItem -Path $($env:LOCALAPPDATA+"\Apps\2.0\") -Filter CreateExoPSSession.ps1 -Recurse ).FullName | Select-Object -Last 1)
-   If ($MFAExchangeModule -eq $null)
-   {
-    Write-Host Exchange Online MFA module is not available -ForegroundColor red
-    Exit
-   }
-  }
-  else
-  {
-   Write-Host Exchange Online PowerShell Module is required
-   Start-Process 'https://o365reports.com/2019/04/17/connect-exchange-online-using-mfa/'
-   Exit
-  }
- }
-
- #Importing Exchange MFA Module
- . "$MFAExchangeModule"
- Write-Host Enter credential in prompt to connect to Exchange Online
- Connect-EXOPSSession -WarningAction SilentlyContinue
-}
-
-#Authentication using non-MFA
-else
-{
- #Storing credential in script for scheduling purpose/ Passing credential as parameter
+ } 
+ Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
  if(($UserName -ne "") -and ($Password -ne ""))
  {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential -ShowBanner:$false
+ }
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
  }
  else
  {
-  $Credential=Get-Credential -Credential $null
+  Connect-ExchangeOnline -ShowBanner:$false
  }
- $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $Credential -Authentication Basic -AllowRedirection -WarningAction SilentlyContinue
- Import-PSSession $Session -AllowClobber -DisableNameChecking | Out-Null
 }
+Connect_Exo
 
 $OutputCSV=".\NonOwner-Mailbox-Access-Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
 $IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
@@ -273,3 +255,6 @@ else
   }
  }
 }
+
+#Disconnect Exchange Online session
+Disconnect-ExchangeOnline -Confirm:$false
