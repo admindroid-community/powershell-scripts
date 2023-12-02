@@ -12,7 +12,8 @@ Script Highlights:
 2.The script can be executed with MFA enabled accounts too. 
 3.Exports output to CSV. 
 4.Automatically installs Microsoft Teams PowerShell module (if not installed already) upon your confirmation. 
-5.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+5.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script.
+6.The script supports certificate-based authentication. 
 
 
 For detailed Script execution: https://o365reports.com/2020/05/28/microsoft-teams-reporting-using-powershell/
@@ -23,7 +24,9 @@ For detailed Script execution: https://o365reports.com/2020/05/28/microsoft-team
 param(
 [string]$UserName, 
 [string]$Password, 
-[switch]$MFA,
+[string]$TenantId,
+[string]$AppId,
+[string]$CertificateThumbprint,
 [int]$Action
 ) 
 
@@ -35,7 +38,7 @@ if($Module.count -eq 0)
  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
  if($Confirm -match "[yY]")
  {
-  Install-Module MicrosoftTeams
+  Install-Module MicrosoftTeams -Scope CurrentUser
  }
  else
  {
@@ -44,15 +47,10 @@ if($Module.count -eq 0)
  }
 }
 Write-Host Importing Microsoft Teams module... -ForegroundColor Yellow
-#Autentication using MFA
-if($mfa.IsPresent)
-{
- $Team=Connect-MicrosoftTeams
-}
+
 
 #Authentication using non-MFA
-else
-{
+
  #Storing credential in script for scheduling purpose/ Passing credential as parameter
  if(($UserName -ne "") -and ($Password -ne ""))
  {
@@ -60,11 +58,15 @@ else
   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
   $Team=Connect-MicrosoftTeams -Credential $Credential
  }
+ elseif(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
+ {  
+  $Team=Connect-MicrosoftTeams  -TenantId $TenantId -ApplicationId $AppId -CertificateThumbprint $CertificateThumbprint 
+ }
  else
  {  
   $Team=Connect-MicrosoftTeams
  }
-}
+
 
 #Check for Teams connectivity
 If($Team -ne $null)
@@ -94,16 +96,14 @@ Do {
  Write-Host  "    4.All Teams' owners report" -ForegroundColor Cyan
  Write-Host  "    5.Specific Teams' owners report" -ForegroundColor Cyan
  Write-Host `nTeams Channel Reporting -ForegroundColor Yellow
- Write-Host  "    6.All channels in organization" -ForegroundColor Cyan
- Write-Host  "    7.All channels in specific Team" -ForegroundColor Cyan
- Write-Host  "    8.Members and Owners Report of Single Channel" -ForegroundColor Cyan
+ Write-Host  "    6.All channels in an organization" -ForegroundColor Cyan
+ Write-Host  "    7.All channels in a specific Team" -ForegroundColor Cyan
+ Write-Host  "    8.Members and Owners Report of a Single Channel" -ForegroundColor Cyan
  Write-Host  "    0.Exit" -ForegroundColor Cyan
  Write-Host `nPrivate Channel Management and Reporting -ForegroundColor Yellow
  Write-Host  "    You can download the script from https://blog.admindroid.com/managing-private-channels-in-microsoft-teams/" -ForegroundColor Cyan
- Write-Host ""
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
- $i = Read-Host 'Please choose the action to continue' 
+
+ $i = Read-Host `n'Please choose the action to continue' 
  }
  else
  {
