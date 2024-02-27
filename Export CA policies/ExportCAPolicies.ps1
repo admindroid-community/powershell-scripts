@@ -1,4 +1,30 @@
-﻿
+﻿<#
+=============================================================================================
+Name:          Export Conditional Access Policies to Excel using PowerShell  
+Description:   The script exports all Conditional Access policies to an Excel file. 
+Version:       2.0
+Website:       o365reports.com
+
+Script Highlights: 
+~~~~~~~~~~~~~~~~~  
+1. The script generates 6 reports with 33 attributes for detailed CA policy analysis. 
+2. The script exports all Conditional Access policies by default. 
+3. It generates report on active CA policies. 
+4. Finds all disabled CA policies. 
+5. It also lists report-only mode CA policies.  
+6. Identifies the recently created CA policies for review. 
+7. Lists recently modified CA policies for tracking changes. 
+8. The script can be executed with MFA-enabled accounts. 
+9. It exports reports to CSV format. 
+10. The script automatically installs the required Microsoft Graph Beta PowerShell module upon user confirmation. 
+11. Supports certificate-based authentication for secure access. 
+12. Includes scheduler-friendly functionality for automated reporting. 
+
+For detailed Script execution: https://o365reports.com/2024/02/20/export-conditional-access-policies-to-excel-using-powershell
+============================================================================================
+#>
+
+
 Param
 (
     [switch]$ActiveCAPoliciesOnly,
@@ -160,7 +186,15 @@ Get-MgBetaIdentityConditionalAccessPolicy -All | Foreach {
  }
 
  #Calculating recently created and modified days
- $CreatedInDays = (New-TimeSpan -Start $CreationTime).Days
+ if($CreationTime -eq $null)
+ {
+  $CreationTime = "-"
+ }
+ else
+ {
+  $CreatedInDays = (New-TimeSpan -Start $CreationTime).Days
+ }
+
  if($LastModifiedTime -eq $null)
  {
   $LastModifiedTime = "-"
@@ -171,7 +205,7 @@ Get-MgBetaIdentityConditionalAccessPolicy -All | Foreach {
  }
 
  #Filter for recently created CA policies
- if(($RecentlyCreatedCAPolicies -ne "") -and ($RecentlyCreatedCAPolicies -lt $CreatedInDays))
+ if(($RecentlyCreatedCAPolicies -ne "") -and (($RecentlyCreatedCAPolicies -lt $CreatedInDays) -or ($CreationTime -eq "-")))
  {
   return
  }
@@ -366,31 +400,3 @@ Get-MgBetaIdentityConditionalAccessPolicy -All | Foreach {
    } 
   }
  }
-
-<#
-=============================================================================================
-Name:          Export Conditional Access Policies to Excel using PowerShell  
-Description:   The script exports all Conditional Access policies to an Excel file. 
-Version:       1.0
-Website:       o365reports.com
-
-Script Highlights: 
-~~~~~~~~~~~~~~~~~  
-1. The script generates 6 reports with 33 attributes for detailed CA policy analysis. 
-2. The script exports all Conditional Access policies by default. 
-3. It generates report on active CA policies. 
-4. Finds all disabled CA policies. 
-5. It also lists report-only mode CA policies.  
-6. Identifies the recently created CA policies for review. 
-7. Lists recently modified CA policies for tracking changes. 
-8. The script can be executed with MFA-enabled accounts. 
-9. It exports reports to CSV format. 
-10. The script automatically installs the required Microsoft Graph Beta PowerShell module upon user confirmation. 
-11. Supports certificate-based authentication for secure access. 
-12. Includes scheduler-friendly functionality for automated reporting. 
-
-For detailed Script execution: https://o365reports.com/2024/02/20/export-conditional-access-policies-to-excel-using-powershell
-============================================================================================
-#>
-
-
