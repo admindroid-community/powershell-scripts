@@ -2,19 +2,20 @@
 =============================================================================================
 Name:           Get Office 365 Room Mailbox Usage Statistics Using PowerShell
 Description:    This script gives detailed information on all Office 365 room mailboxes usage
-Version:        2.0
+Version:        3.0
 Website:        o365reports.com
 
 Script Highlights:
-~~~~~~~~~~~~~~~~~
-1.Automatically installs the MS Graph PowerShell module upon your confirmation when it is not available on your machine. 
-2.Also, you can execute this script with certificate-based authentication (CBA). 
-3.You can execute the script with an MFA-enabled account too. 
+~~~~~~~~~~~~~~~~~~
+1.Automatically installs the MS Graph PowerShell module upon your confirmation when it is not available on your machine. 
+2.Also, you can execute this script with certificate-based authentication (CBA). 
+3.You can execute the script with an MFA-enabled account too. 
 4.Helps to filter details about online meetings alone.
 5.Gets meetings details by organizers.
 6.Helps to identify meeting scheduled for today.
 7.Further, this script is scheduler-friendly! Therefore, you can automate the report generation easily.
 8.The script generates 2 output file, one with detailed info and another with summary info.
+
 
 For detailed script execution: https://o365reports.com/2023/05/23/get-office-365-room-mailbox-usage-statistics-using-powershell/
 ============================================================================================
@@ -31,40 +32,44 @@ For detailed script execution: https://o365reports.com/2023/05/23/get-office-365
 
 Function Connect_MgGraph
 {
- #Check for module installation
- $Module=Get-Module -Name microsoft.graph -ListAvailable
- if($Module.count -eq 0) 
+ $MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+ if($MsGraphBetaModule -eq $null)
  { 
-  Write-Host Microsoft Graph PowerShell SDK is not available  -ForegroundColor yellow  
-  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
-  if($Confirm -match "[yY]") 
-  { 
-   Write-host "Installing Microsoft Graph PowerShell module..."
-   Install-Module Microsoft.Graph -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
-  }
-  else
-  {
-   Write-Host "Microsoft Graph PowerShell module is required to run this script. Please install module using Install-Module Microsoft.Graph cmdlet." 
-   Exit
-  }
+    Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
+    if($confirm -match "[yY]") 
+    { 
+        Write-host "Installing Microsoft Graph Beta module..."
+        Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+        Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
+    } 
+    else
+    { 
+        Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
+        Exit 
+    } 
  }
- #Disconnect Existing MgGraph session
- if($CreateSession.IsPresent)
- {
-  Disconnect-MgGraph
- }
-
- #Connecting to MgGraph beta
- Select-MgProfile -Name beta
- Write-Host Connecting to Microsoft Graph...
+ Disconnect-MgGraph -ErrorAction SilentlyContinue | Out-Null
  if(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
  {  
-  Connect-MgGraph  -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint 
+    Connect-MgGraph  -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -ErrorAction SilentlyContinue -ErrorVariable ConnectionError|Out-Null
+    if($ConnectionError -ne $null)
+    {    
+        Write-Host $ConnectionError -Foregroundcolor Red
+        Exit
+    }
  }
  else
  {
-  Connect-MgGraph -Scopes "Place.Read.All","User.Read.All","Calendars.Read","Calendars.Read.Shared"  
+    Connect-MgGraph -Scopes "Place.Read.All,User.Read.All,Calendars.Read.Shared"  -ErrorAction SilentlyContinue -Errorvariable ConnectionError |Out-Null
+    if($ConnectionError -ne $null)
+    {
+        Write-Host "$ConnectionError" -Foregroundcolor Red
+        Exit
+    }
  }
+ Write-Host "Microsoft Graph Beta PowerShell module is connected successfully" -ForegroundColor Green
+ Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh Powershell window." -ForegroundColor Yellow
 }
 Connect_MgGraph
 
@@ -78,7 +83,7 @@ $MbCount=0
 $PrintedMeetings=0
 
 #Retrieving all room mailboxes
-Get-MgPlaceAsRoom -All | foreach {
+Get-MgBetaPlaceAsRoom -All | foreach {
  $RoomAddress=$_.EmailAddress
  $RoomName=$_.DisplayName
  $MeetingCount=0
@@ -87,7 +92,7 @@ Get-MgPlaceAsRoom -All | foreach {
  $OnlineMeetingCount=0
  $AllDayMeetingCount=0
  
- Get-MgUserCalendarView  -UserId $RoomAddress -StartDateTime $startDate -EndDateTime $EndDate -All | foreach {
+ Get-MgBetaUserCalendarView  -UserId $RoomAddress -StartDateTime $startDate -EndDateTime $EndDate -All | foreach {
   Write-Progress -Activity "`n     Processing room: $Count - $RoomAddress : Meeting Count - $MeetingCount"
   if($_.IsCancelled -eq $false)
   {
@@ -159,7 +164,7 @@ Get-MgPlaceAsRoom -All | foreach {
 Write-Host `nScript executed successfully
 if((Test-Path -Path $ExportCSV) -eq "True")
 {
-    Write-Host "Exported report has $PrintedMeetings meeting(s)" 
+    Write-Host "`nExported report has" -NoNewLine ; Write-Host " $PrintedMeetings meeting(s)" -ForegroundColor Magenta
     $Prompt = New-Object -ComObject wscript.shell
     $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)
     if ($UserInput -eq 6)
@@ -167,19 +172,12 @@ if((Test-Path -Path $ExportCSV) -eq "True")
         Invoke-Item "$ExportCSV"
         Invoke-Item "$ExportSummaryCSV"
     }
-    Write-Host "Detailed report available in: $ExportCSV"
-    Write-Host "Summary report available in: $ExportSummaryCSV"
+    Write-Host `nDetailed report available in: -NoNewline -Foregroundcolor Yellow; Write-Host " $ExportCSV" 
+    Write-Host `nSummary report available in: -NoNewline -ForegroundColor Yellow; Write-Host " $ExportSummaryCSV `n" 
 }
 else
 {
     Write-Host "No meetings found" -ForegroundColor Red
 }
-
-
-    
-
-   
-  
-
-
- 
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
