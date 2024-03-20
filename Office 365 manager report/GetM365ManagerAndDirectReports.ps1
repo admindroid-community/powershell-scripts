@@ -2,20 +2,21 @@
 =============================================================================================
 Name:           Export Office 365 User's Manager Report
 Description:    This script exports Office 365 users and their manager to CSV
-Version:        1.0
+Version:        2.0
 Website:        o365reports.com
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~
 1.Generates 10+ different manager reports to view the managers and direct reports status.  
-2.Automatically installs the Azure AD module upon your confirmation when it is not available in your machine. 
+2.Automatically installs MS Graph module upon your confirmation when it is not available in your machine. 
 3.Shows list of all Azure AD users and their manager.  
 4.List of all Office 365 users with no manager. 
 5.Allows specifying user departments to get their manager details. 
 6.You can get the direct reports of the Office 365 managers. 
 7.Supports both MFA and Non-MFA accounts.    
 8.Exports the report in CSV format.  
-9.Scheduler-friendly. You can automate the report generation upon passing credentials as parameters. 
+9.Scheduler-friendly. 
+10.Supports certificate-based authentication (CBA) too. 
 
 For detailed Script execution: https://o365reports.com/2021/07/13/export-office-365-user-manager-and-direct-reports-using-powershell
 ============================================================================================
@@ -28,40 +29,49 @@ param (
     [Switch] $DisabledUsers,
     [Switch] $UnlicensedUsers,
     [Switch] $DirectReports,
-    [string[]] $Department
+    [string[]] $Department,
+     [switch]$CreateSession,
+    [string]$TenantId,
+    [string]$ClientId,
+    [string]$CertificateThumbprint
 )
 
 
-#Check AzureAD module availability and connects the module
-Function ConnectToAzureAD {
-    $AzureAd = (Get-Module AzureAD -ListAvailable).Name
-    if ($Empty -eq $AzureAd) {
-        Write-host "Important: AzureAD PowerShell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully."  
-        $confirm = Read-Host Are you sure you want to install module? [Y] Yes [N] No  
-        if ($confirm -match "[yY]") { 
-            Write-host "Installing AzureAD"
-            Install-Module AzureAd -Allowclobber -Repository PSGallery -Force
-            Write-host `n"AzureAD module is installed in the system successfully."
-        }
-        else { 
-            Write-host "Exiting. `nNote: AzureAD PowerShell module must be available in your system to run the script."  
-            Exit 
-        }
-    }
-    #Importing Module by default will avoid the cmdlet unrecognized error 
-    Import-Module AzureAd -ErrorAction SilentlyContinue -Force
-    #Storing credential in script for scheduling purpose/Passing credential as parameter   
-    if (($UserName -ne "") -and ($Password -ne "")) {   
-        $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force   
-        $Credential = New-Object System.Management.Automation.PSCredential $UserName, $SecuredPassword   
-        Connect-AzureAD -Credential $Credential | Out-Null
-    }   
-    else {   
-        Connect-AzureAD | Out-Null
-    }
-    Write-Host `n"AzureAD PowerShell module is connected successfully"
-	Write-Host ""
-    #End of Connecting AzureAD
+Function Connect_MgGraph
+{
+ #Check for module installation
+ $Module=Get-Module -Name microsoft.graph.beta -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host Microsoft Graph PowerShell SDK is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Microsoft Graph PowerShell module..."
+   Install-Module Microsoft.Graph.beta -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
+  }
+  else
+  {
+   Write-Host "Microsoft Graph Beta PowerShell module is required to run this script. Please install module using Install-Module Microsoft.Graph cmdlet." 
+   Exit
+  }
+ }
+ #Disconnect Existing MgGraph session
+ if($CreateSession.IsPresent)
+ {
+  Disconnect-MgGraph
+ }
+
+
+ Write-Host Connecting to Microsoft Graph...
+ if(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
+ {  
+  Connect-MgGraph  -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -NoWelcome
+ }
+ else
+ {
+  Connect-MgGraph -Scopes "User.Read.All","AuditLog.read.All"  -NoWelcome
+ }
 }
 
 #Handle Empty attributes here
@@ -96,18 +106,20 @@ Function FindUseCase {
             $UseCaseFilter = '($_.AssignedLicenses).count -eq 0'
         }
     }
-
+    Write-Host "Generating report..." -ForegroundColor Cyan
     if ($UseCaseFilter -ne $null) { 
         #Filters the users to generate report
         $UseCaseFilter = [ScriptBlock]::Create($UseCaseFilter)
-        Get-AzureADUser -All $true | Where-Object $UseCaseFilter | foreach-object {
+        Get-MgBetaUser -All | Where-Object $UseCaseFilter | foreach-object {
             $CurrUserData = $_
+            $UserId=$_.Id
             ProcessUserData
         }
     } else { 
         #No Filter- Gets all the users without any filter
-        Get-AzureADUser -All $true | foreach-object {
+        Get-MgBetaUser -All | foreach-object {
             $CurrUserData = $_
+            $UserId=$_.Id
             ProcessUserData
         }
     }
@@ -116,15 +128,14 @@ Function FindUseCase {
 #Processes User info and calls respective functions based on the requested report
 Function ProcessUserData {
     if ($DirectReports.IsPresent) {
-        $CurrUserDirectReport = Get-AzureADUserDirectReport -ObjectID (($CurrUserData.ObjectId).Tostring())
+        $CurrUserDirectReport = Get-MgBetaUserDirectReport -UserId $userId | select -ExpandProperty additionalProperties
         if ($CurrUserDirectReport -ne $Empty) { 
             #Manager has Direct Reports, Exporting Manager and their Direct Reports Info
             RetrieveUserDirectReport
             ExportManagerAndDirectReports
         }
     } else {
-        $CurrManagerData = Get-AzureADUserManager -objectID (($CurrUserData.ObjectId).Tostring())
-
+        $CurrManagerData = Get-MgBetaUserManager -UserId $userId -ErrorAction SilentlyContinue
         #Processing Manager Report Types
         if ($CurrManagerData -ne $Empty -and !$UsersWithoutManager.IsPresent) {
             #User has Manager assigned, Exporting User & Manager Data.
@@ -164,10 +175,11 @@ Function RetrieveUserManagerData {
 
     #Processing manager data 
     if ($CurrManagerData -ne $Empty) {
-        $global:ManagerName = $CurrManagerData.DisplayName
-        $global:ManagerUPN = $CurrManagerData.UserPrincipalName
-        $global:ManagerDepartment = GetPrintableValue $CurrManagerData.Department
-        if ( ($CurrManagerData.AccountEnabled) -eq $True) {
+        $ManagerDetails=$CurrManagerData.AdditionalProperties
+        $global:ManagerName = $ManagerDetails.displayName
+        $global:ManagerUPN = $ManagerDetails.userPrincipalName
+        $global:ManagerDepartment = GetPrintableValue $ManagerDetails.department
+        if ( ($ManagerDetails.accountEnabled) -eq $True) {
             $global:ManagerAccount = "Active"
         }
         else {
@@ -185,24 +197,11 @@ Function RetrieveUserDirectReport {
     $global:ManagerDepartment = GetPrintableValue $CurrUserData.Department
 
     #Processing Direct report data
-    $global:NoOfDirectReports = ($CurrUserDirectReport.DisplayName).count
-    if ($global:NoOfDirectReports -gt 1) {
-        $NameList = @()
-        $UPNList = @()
+    $global:NoOfDirectReports = ($CurrUserDirectReport.displayName).count
+    Write-Host $CurrUserDirectReport -ForegroundColor Green
+    $global:DirectReportsNames=$CurrUserDirectReport.displayName -join ","
+    $global:DirectReportsUPNs=$CurrUserDirectReport.userPrincipalName -join ","
 
-        $CurrUserDirectReport | Select-Object DisplayName | ForEach-Object { 
-            $NameList += $($_.DisplayName)
-            $global:DirectReportsNames = ($NameList -join ", ") 
-        }
-        $CurrUserDirectReport | Select-Object UserPrincipalName | ForEach-Object { 
-            $UPNList += $($_.UserPrincipalName)
-            $global:DirectReportsUPNs = ($UPNList -join ", ") 
-        }
-        
-    } elseif ($global:NoOfDirectReports.count -eq 1) {
-        $global:DirectReportsNames = $CurrUserDirectReport.DisplayName
-        $global:DirectReportsUPNs = $CurrUserDirectReport.UserPrincipalName
-    }
 }
 
 #Used for 'UsersWithoutManager' param. Exports user info alone.
@@ -236,7 +235,7 @@ Function ExportManagerAndDirectReports {
 }
 
 # Execution starts here.
-ConnectToAzureAD
+Connect_MgGraph
 
 $global:ExportedUser = 0
 $global:ReportTime = ((Get-Date -format "MMM-dd hh-mm-ss tt").ToString()) + ".csv"
@@ -257,8 +256,5 @@ if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {
     #Notification when usecase doesn't have the data in the tenant
     Write-Host `n"No data found with the specified criteria"
 }
-Write-Host `nFor more Microsoft 365 reports"," please check o365reports.com -ForegroundColor Cyan
-Disconnect-AzureAD
-Write-host "`nDisconnected AzureAD Session Successfully"
 Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
 Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
