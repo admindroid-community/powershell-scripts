@@ -2,7 +2,7 @@
 =============================================================================================
 Name:           Office 365 User Login History Report
 Website:        o365reports.com
-Version:        3.0
+Version:        4.0
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~
@@ -29,6 +29,9 @@ Param
     [Nullable[DateTime]]$StartDate,
     [Nullable[DateTime]]$EndDate,
     [string]$UserName,
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint,
     [string]$AdminName,
     [string]$Password
 )
@@ -60,22 +63,21 @@ else
  }
 }
 
-
- #Check for EXO v2 module inatallation
- $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+#Check for EXO module inatallation
+$Module = Get-Module ExchangeOnlineManagement -ListAvailable
  if($Module.count -eq 0) 
  { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  Write-Host Exchange Online PowerShell module is not available  -ForegroundColor yellow  
   $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
   if($Confirm -match "[yY]") 
   { 
    Write-host "Installing Exchange Online PowerShell module"
-   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force -Scope CurrentUser
    Import-Module ExchangeOnlineManagement
   } 
   else 
   { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
  } 
@@ -85,14 +87,19 @@ else
  {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
   $Credential  = New-Object System.Management.Automation.PSCredential $AdminName,$SecuredPassword
-  Connect-ExchangeOnline -Credential $Credential
+  Connect-ExchangeOnline -Credential $Credential -ShowBanner:$false
+ }
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
  }
  else
  {
-  Connect-ExchangeOnline
+  Connect-ExchangeOnline -ShowBanner:$false
  }
 
-$OutputCSV=".\AuditLog_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
+$Location=Get-Location
+$OutputCSV="$Location\UserLoginHistoryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 $IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
 $CurrentStart=$StartDate
 $CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
@@ -100,7 +107,7 @@ $CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
 #Filter for successful login attempts
 if($success.IsPresent)
 {
- $Operation="UserLoggedIn,TeamsSessionStarted,MailboxLogin"
+ $Operation="UserLoggedIn,TeamsSessionStarted,MailboxLogin,SignInEvent"
 }
 #Filter for successful login attempts
 elseif($Failed.IsPresent)
@@ -109,7 +116,7 @@ elseif($Failed.IsPresent)
 }
 else
 {
- $Operation="UserLoggedIn,UserLoginFailed,TeamsSessionStarted,MailboxLogin"
+ $Operation="UserLoggedIn,UserLoginFailed,TeamsSessionStarted,MailboxLogin,SignInEvent"
 }
 
 #Check whether CurrentEnd exceeds EndDate(checks for 1st iteration)
@@ -143,7 +150,7 @@ while($true)
  {
   $Results=Search-UnifiedAuditLog -StartDate $CurrentStart -EndDate $CurrentEnd -Operations $Operation -SessionId s -SessionCommand ReturnLargeSet -ResultSize 5000
  }
- #$Results.count
+ $ResultsCount=($Results|Measure-Object).count
  $AllAuditData=@()
  $AllAudits=
  foreach($Result in $Results)
@@ -154,11 +161,12 @@ while($true)
   $AllAuditData= New-Object PSObject -Property $AllAudits
   $AllAuditData | Sort 'Login Time','User Name' | select 'Login Time','User Name','IP Address',Operation,'Result Status',Workload | Export-Csv $OutputCSV -NoTypeInformation -Append
  }
- Write-Progress -Activity "`n     Retrieving audit log from $StartDate to $EndDate.."`n" Processed audit record count: $AggregateResults"
+ 
  #$CurrentResult += $Results
- $currentResultCount=$CurrentResultCount+($Results.count)
- $AggregateResults +=$Results.count
- if(($CurrentResultCount -eq 50000) -or ($Results.count -lt 5000))
+ $currentResultCount=$CurrentResultCount+$ResultsCount
+ $AggregateResults +=$ResultsCount
+ Write-Progress -Activity "`n     Retrieving audit log from $CurrentStart to $CurrentEnd.."`n" Processed audit record count: $AggregateResults"
+ if(($CurrentResultCount -eq 50000) -or ($ResultsCount -lt 5000))
  {
   if($CurrentResultCount -eq 50000)
   {
@@ -194,8 +202,10 @@ while($true)
   $CurrentResultCount=0
   $CurrentResult = @()
  }
+ $c=($Results | Measure-Object).Count
 }
 
+#Open output file after execution
 If($AggregateResults -eq 0)
 {
  Write-Host No records found
@@ -210,6 +220,16 @@ else
     Write-Host `nThe output file contains $AggregateResults audit records
   Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
 Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
+   $Prompt = New-Object -ComObject wscript.shell   
+  $UserInput = $Prompt.popup("Do you want to open output file?",`   
+ 0,"Open Output File",4)   
+  If ($UserInput -eq 6)   
+  {   
+   Invoke-Item "$OutputCSV"   
+  } 
  }
  
 }
+
+#Disconnect Exchange Online session
+Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
