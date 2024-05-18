@@ -1,7 +1,9 @@
 ﻿<#
 =============================================================================================
-Name:           Export Microsoft 365 Users' SSPR Status Reports 
-
+Name:           Export Microsoft 365 Users' Self-service Password Reset (SSPR) Status Reports 
+Description:    The script exports users' Self-service password reset status reports to CSV. 
+Version:        1.0
+Website:        o365reports.com
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~  
@@ -17,6 +19,8 @@ Script Highlights:
 10. The script installs the required Microsoft Graph Beta module upon user confirmation if not already installed. 
 11. Supports certificate-based authentication (scheduler-friendly) method. 
 
+
+For detailed Script execution: https://o365reports.com/2024/02/13/export-microsoft-365-users-self-service-password-reset-sspr-status-reports
 ============================================================================================
 #>
 Param
@@ -83,7 +87,7 @@ $Results=@()
 $OutputCount=0
 $ProcessedUsersCount=0
 Write-Host "Generating M365 users' SSPR status report..." -ForegroundColor Cyan
-Get-MgBetaReportAuthenticationMethodUserRegistrationDetail | ? { $_.UserType -eq 'member' } | foreach {
+Get-MgBetaReportAuthenticationMethodUserRegistrationDetail -All | ? { $_.UserType -eq 'member' } | foreach {
  $UPN=$_.UserPrincipalName
  $DisplayName=$_.UserDisplayName
  $IsAdmin=$_.IsAdmin
@@ -164,14 +168,3 @@ Get-MgBetaReportAuthenticationMethodUserRegistrationDetail | ? { $_.UserType -eq
  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
  
-
- <#
-=============================================================================================
-Name:           Export Microsoft 365 Users' Self-service Password Reset (SSPR) Status Reports 
-Description:    The script exports users' Self-service password reset status reports to CSV. 
-Version:        1.0
-Website:        o365reports.com
-
-For detailed Script execution: https://o365reports.com/2024/02/13/export-microsoft-365-users-self-service-password-reset-sspr-status-reports
-============================================================================================
-#>
