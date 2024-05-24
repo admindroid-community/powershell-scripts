@@ -1,23 +1,22 @@
 ﻿<#
 =============================================================================================
 Name:           Export Office 365 MFA status report
-Description:    This script exports Microsoft 365 MFA status report to CSV
-Version:        2.2
+Description:    This script exports Microsoft 365 MFA status report based on per-user MFA configuration
+Version:        2.3
 website:        o365reports.com
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~
 
-1.The result can be filtered based on MFA status. i.e., you can filter MFA enabled users/enforced users/disabled users alone. For example using the ‘EnabledOnly‘ flag you shall export Office 365 users’ MFA enabled status to CSV file.
-2.Exports result to CSV file. 
-3.Result can be filtered based on Admin users.
-4.You can filter result to display Licensed users alone.
-5.You can filter result based on SignIn Status (SignIn allowed/denied).
-6.The script produces different output files based on MFA status. 
-7.You can use this script to get users’ MFA status set by Conditional Access.
-8.The script can be executed with MFA enabled account. 
-9.Using the ‘Admin Roles’ column, you can find users with admin roles that are not protected with MFA. For example, you can find Global Admins without MFA.
-10.The script is scheduler friendly. i.e., credentials can be passed as parameter instead of saving inside the script. 
+1.Generates reports based on MFA status. 
+2.Result can be filtered based on Admin users.
+3.You can filter result to display Licensed users alone.
+4.You can filter result based on Sign-in Status (SignIn allowed/denied).
+5.The script produces different output files based on MFA status. 
+6.The script can be executed with MFA enabled account. 
+7.Exports result to CSV file. 
+8.Using the 'Admin Roles' column, you can find users with admin roles that are not protected with MFA. For example, you can find Global Admins without MFA.
+9.The script is scheduler friendly. i.e., credentials can be passed as parameter instead of saving inside the script. 
 
 For detailed Script execution: https://o365reports.com/2019/05/09/export-office-365-users-mfa-status-csv
 ============================================================================================
@@ -28,7 +27,6 @@ Param
     [switch]$DisabledOnly,
     [switch]$EnabledOnly,
     [switch]$EnforcedOnly,
-    [switch]$ConditionalAccessOnly,
     [switch]$AdminOnly,
     [switch]$LicensedUserOnly,
     [Nullable[boolean]]$SignInAllowed = $null,
@@ -132,16 +130,11 @@ Get-MsolUser -All | foreach{
  }
 
  #Check for MFA enabled user
- if(($MethodTypes -ne $Null) -or ($MFAStatus -ne $Null) -and (-Not ($DisabledOnly.IsPresent) ))
+ if(($MFAStatus -ne $Null) -and (-Not ($DisabledOnly.IsPresent) ))
  {
-  #Check for Conditional Access
-  if($MFAStatus -eq $null)
-  {
-   $MFAStatus='Enabled via Conditional Access'
-  }
 
   #Filter result based on EnforcedOnly filter
-  if((([string]$MFAStatus -eq "Enabled") -or ([string]$MFAStatus -eq "Enabled via Conditional Access")) -and ($EnforcedOnly.IsPresent))
+  if(([string]$MFAStatus -eq "Enabled") -and ($EnforcedOnly.IsPresent))
   {
    return
   }
@@ -152,11 +145,6 @@ Get-MsolUser -All | foreach{
    return
   }
 
-  #Filter result based on MFA enabled via Other source
-  if((($MFAStatus -eq "Enabled") -or ($MFAStatus -eq "Enforced")) -and ($ConditionalAccessOnly.IsPresent))
-  {
-   return
-  }
 
   $Methods=""
   $MethodTypes=""
