@@ -1,19 +1,25 @@
 ﻿<#
 =============================================================================================
-Name:           Export Office 365 Users’ Last Password Change Date using MS Graph
+Name:           Microsoft 365 password expiry reports
+Description:    Export Office 365 Users’ Last Password Change Date and expiry date using MS Graph
 website:        o365reports.com
-Script by:      O365Reports Team
-Version:        5.0
+Version:        5.1
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~
-#. A single script allows you to generate 7 different password reports. 
-#. The script uses MS Graph PowerShell and installs MS Graph PowerShell SDK (if not installed already) upon your confirmation. 
-#. It can be executed with certificate-based authentication (CBA) too.
-#. The script can be executed with MFA enabled accounts too 
-#. Exports output to CSV 
-#. You can filter result to display Licensed users alone 
-#. The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+1. A single script allows you to generate 7 different password reports. 
+           #.Export all users and their last password change and expiry date
+           #.List users with password never expiry
+           #.Exports password expired users
+           #.helps to find soon-to-expire password users
+           #.Helps to track recent password changers, etc
+2. Generates pwd reports for all or Licensed users alone 
+3. Gnerates pwd reports for all or sign-in enabled users alone
+4. The script uses MS Graph PowerShell and installs MS Graph PowerShell SDK (if not installed already) upon your confirmation. 
+5. It can be executed with certificate-based authentication (CBA) too.
+6. The script can be executed with MFA enabled accounts too 
+7. Exports output to CSV 
+8. The script is supports certificate-based authetication
 
 For detailed Script execution: https://o365reports.com/2020/02/17/export-office-365-users-last-password-change-date-to-csv
 ============================================================================================
@@ -49,6 +55,7 @@ if($MsGraphBetaModule -eq $null)
         Exit 
     } 
 }
+Write-Host "Connecting to MS Graph PowerShell..."
 if(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
 {  
     Connect-MgGraph  -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -ErrorAction SilentlyContinue -ErrorVariable ConnectionError|Out-Null
@@ -67,15 +74,15 @@ else
         Exit
     }
 }
-Write-Host "Microsoft Graph Beta Powershell module is connected successfully" -ForegroundColor Green
-Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh Powershell window." -ForegroundColor Yellow
+
 
 $UserCount = 0 
 $PrintedUser = 0 
 $Result = ""
 $PwdPolicy=@{}
 #Output file declaration 
-$ExportCSV = ".\PasswordExpiryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
+$Location=Get-Location
+$ExportCSV = "$Location\PasswordExpiryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm-ss` tt).ToString()).csv" 
 
 #Getting Password policy for the domain
 $Domains = Get-MgBetaDomain   #-Status Verified
@@ -96,13 +103,14 @@ foreach($Domain in $Domains)
     }
     $PwdPolicy.Add($Domain.Id,$PwdValidity)
 }
-Write-Host Generating report... -ForegroundColor Magenta
+Write-Host "Generating M365 users' password expiry report..." -ForegroundColor Magenta
 #Loop through each user 
-Get-MgBetaUser -All -Property DisplayName,UserPrincipalName,LastPasswordChangeDateTime,PasswordPolicies,AssignedLicenses,AccountEnabled | foreach{ 
+Get-MgBetaUser -All -Property DisplayName,UserPrincipalName,LastPasswordChangeDateTime,PasswordPolicies,AssignedLicenses,AccountEnabled,SigninActivity | foreach{ 
     $UPN = $_.UserPrincipalName
     $DisplayName = $_.DisplayName
     [boolean]$Federated = $false
     $UserCount++
+    Write-Progress -Activity "`n     Processed user count: $UserCount "`n"  Currently Processing: $DisplayName"
     #Remove external users
     if($UPN -like "*#EXT#*")
     {
@@ -111,8 +119,19 @@ Get-MgBetaUser -All -Property DisplayName,UserPrincipalName,LastPasswordChangeDa
     $PwdLastChange = $_.LastPasswordChangeDateTime
     $PwdPolicies = $_.PasswordPolicies
     $LicenseStatus = $_.AssignedLicenses
+    $LastSignInDate=$_.SignInActivity.LastSignInDateTime
+    #Calculate Inactive days
+    if($LastSignInDate -eq $null)
+    { 
+     $LastSignInDate="Never Logged-in"
+     $InactiveDays= "-"
+    }
+    else
+    {
+     $InactiveDays= (New-TimeSpan -Start $LastSignInDate).Days
+    }
     $Print = 0
-    Write-Progress -Activity "`n     Processed user count: $UserCount "`n"  Currently Processing: $DisplayName"
+    
     if($LicenseStatus -ne $null)
     {
         $LicenseStatus = "Licensed"
@@ -216,7 +235,7 @@ Get-MgBetaUser -All -Property DisplayName,UserPrincipalName,LastPasswordChangeDa
     }
     $PrintedUser++ 
     #Export result to csv
-    $Result = [PSCustomObject]@{'Display Name'=$_.DisplayName;'User Principal Name'=$UPN;'Pwd Last Change Date'=$PwdLastChange;'Days since Pwd Last Set'=$PwdSinceLastSet;'Pwd Expiry Date'=$PwdExpiryDate;'Friendly Expiry Time'=$PwdExpireIn ;'License Status'=$LicenseStatus;'Days since Expiry(-) / Days to Expiry(+)'=$PwdExpiresIn;'Account Status'=$AccountStatus}
+    $Result = [PSCustomObject]@{'Display Name'=$_.DisplayName;'User Principal Name'=$UPN;'Pwd Last Change Date'=$PwdLastChange;'Days since Pwd Last Set'=$PwdSinceLastSet;'Pwd Expiry Date'=$PwdExpiryDate;'Friendly Expiry Time'=$PwdExpireIn ;'Days since Expiry(-) / Days to Expiry(+)'=$PwdExpiresIn;'License Status'=$LicenseStatus;'Account Status'=$AccountStatus;'Last Sign-in Date'=$LastSignInDate;'Inactive Days'=$InactiveDays}
     $Result | Export-Csv -Path $ExportCSV -Notype -Append 
 }
 if($UserCount -eq 0)
@@ -227,6 +246,9 @@ else
 {
     Write-Host "`nThe output file contains " -NoNewline
     Write-Host  $PrintedUser users. -ForegroundColor Green
+    Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+
     if((Test-Path -Path $ExportCSV) -eq "True") 
     {
         Write-Host `n "The Output file availble in:" -NoNewline -ForegroundColor Yellow; Write-Host "$ExportCSV" `n 
@@ -239,7 +261,5 @@ else
         } 
     }
 }
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
 
 Disconnect-MgGraph | Out-Null
