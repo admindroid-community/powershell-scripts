@@ -9,6 +9,7 @@ The script exports an output CSV file that looks similar to the screenshot below
 
 ## Microsoft 365 Reporting Tool by AdminDroid
 Looking for more in-depth reporting? [AdminDroid Microsoft 365 reporting tool](https://admindroid.com/?src=GitHub) offers an extensive collection of over 1800 out-of-the-box reports and dashboards. It’s the perfect complement to your PowerShell scripts.
-&nbsp;
+<br/>
+
 *View more comprehensive MFA status report through AdminDroid: <https://demo.admindroid.com/#/1/11/reports/106/1/20>*
 
