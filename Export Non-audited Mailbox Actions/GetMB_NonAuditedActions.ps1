@@ -22,40 +22,53 @@ Param
 (
     [Parameter(Mandatory = $false)]
     [string]$UserName = $NULL,
-    [string]$Password = $NULL
+    [string]$Password = $NULL,
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint
 )
 $AuditAdmin = @("ApplyRecord", "Copy", "Create", "FolderBind", "HardDelete", "MailItemsAccessed", "Move", "MoveToDeletedItems", "RecordDelete", "Send", "SendAs", "SendOnBehalf", "SoftDelete", "Update", "UpdateCalendarDelegation", "UpdateFolderPermissions", "UpdateComplianceTag" , "UpdateInboxRules")
 $AuditDelegate = @("ApplyRecord", "Create", "FolderBind", "HardDelete", "MailItemsAccessed", "Move", "MoveToDeletedItems", "RecordDelete", "SendAs", "SendOnBehalf", "SoftDelete", "Update", "UpdateFolderPermissions", "UpdateComplianceTag", "UpdateInboxRules")
 $AuditOwner = @("ApplyRecord", "Create", "HardDelete", "MailboxLogin", "MailItemsAccessed", "Move", "MoveToDeletedItems", "RecordDelete", "Send", "SearchQueryInitiated", "SoftDelete", "Update", "UpdateCalendarDelegation", "UpdateFolderPermissions", "UpdateComplianceTag", "UpdateInboxRules")
+
 function Connect_Exo {
-    #Check for EXO v2 module inatallation
-    $Module = Get-Module ExchangeOnlineManagement -ListAvailable
-    if ($Module.count -eq 0) { 
-        Write-Host "Exchange Online PowerShell V2 module is not available"  -ForegroundColor yellow  
-        $Confirm = Read-Host "Are you sure you want to install module? [Y] Yes [N] No" 
-        if ($Confirm -match "[yY]") { 
-            Write-host "Installing Exchange Online PowerShell module"
-            Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
-        } 
-        else { 
-            Write-Host "EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet." 
-            Exit
-        }
-    } 
-    Write-Host "Connecting to Exchange Online..."
-    Import-Module ExchangeOnline -ErrorAction SilentlyContinue -Force
-    #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
-    if (($UserName -ne "") -and ($Password -ne "")) {
-        $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
-        $Credential = New-Object System.Management.Automation.PSCredential $UserName, $SecuredPassword
-        Connect-ExchangeOnline -Credential $Credential
-    }
-    else {
-        Connect-ExchangeOnline
-    }
-    Write-Host "ExchangeOnline PowerShell module is connected successfully"`n
+#Check for EXO module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host Exchange Online PowerShell module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force -Scope CurrentUser
+   Import-Module ExchangeOnlineManagement
+  } 
+  else 
+  { 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Exit
+  }
+ } 
+ Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
+ if(($UserName -ne "") -and ($Password -ne ""))
+ {
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential -ShowBanner:$false
+ }
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
+ }
+ else
+ {
+  Connect-ExchangeOnline -ShowBanner:$false
+ }
 }
-$global:ExportCSVFileName = "Mailboxes_NonAuditingActions_Report_" + ((Get-Date -format "MMM-dd hh-mm-ss tt").ToString()) + ".csv"
+$Location=Get-Location
+$global:ExportCSVFileName = "$Location\Mailboxes_NonAuditingActions_Report_" + ((Get-Date -format "MMM-dd hh-mm-ss tt").ToString()) + ".csv"
 function MailboxNotAudited {
     $Audit_Check = Get-OrganizationConfig | Select AuditDisabled
     if ($Audit_Check.AuditDisabled -eq $true) {
@@ -101,8 +114,7 @@ Connect_Exo
 MailboxNotAudited
 if ((Test-Path -Path $global:ExportCSVFileName) -eq "True") {     
     Write-Host "Mailboxes and disabled auditing actions are exported"`n
-    Write-Host " The report available in:" -NoNewline -ForegroundColor Yellow; Write-Host .\$global:ExportCSVFileName `n
-    Write-Host "Disconnected active ExchangeOnline session"
+    Write-Host " The report available in:" -NoNewline -ForegroundColor Yellow; Write-Host $global:ExportCSVFileName `n
     Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
     Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; 
     Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
