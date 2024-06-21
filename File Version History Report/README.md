@@ -5,7 +5,7 @@ Learn how to export SharePoint Online file version history report using PowerShe
 
 The exported SharePoint version size report looks like the screenshot below.
 
-![File version history report](https://o365reports.com/wp-content/uploads/2024/06/SharePoint-version-history-report-1024x177.png? v=1718880863)
+![File version history report](https://o365reports.com/wp-content/uploads/2024/06/SharePoint-version-history-report-1024x177.png?v=1718880863)
 ## **Powerful Microsoft 365 Reporting Tool by AdminDroid**
 If this script is helpful, you’ll love [AdminDroid’s Microsoft 365 reporting tool](https://admindroid.com/?src=GitHub)! With over 1800 pre-built reports and dashboards, it’s a fantastic way to dive deeper into your M365 data.
 
