@@ -1,8 +1,8 @@
 ﻿<#
 =============================================================================================
 
-Name         : Export Microsoft 365 License Cost Report Using PowerShell  
-Version      : 1.0
+Name         : Export Microsoft 365 License Cost & Usage Report Using PowerShell  
+Version      : 1.1
 website      : o365reports.com
 
 -----------------
@@ -82,7 +82,7 @@ function ConnectMgGraph{
     #Connect to MgGraph.
     else
     {
-        Connect-MgGraph -Scopes "User.Read.All","UserAuthenticationMethod.Read.All " -NoWelcome
+        Connect-MgGraph -Scopes "User.Read.All","AuditLog.Read.All","Directory.Read.All" -NoWelcome
         if( (Get-MgContext) -ne $null )
         {
             Write-Host "Connected to Microsoft Graph PowerShell using" (Get-MgContext).Account "account.`n" -ForegroundColor Green
@@ -106,7 +106,8 @@ function LicenceUsageReport
     $TotalUnusedUnitsCost=0
 
     #result path for Organization license report.
-    $Global:organizationLicenseResultPath= "$PSScriptRoot\LicenseUsageReport "+$DateTime+".csv"
+    $Location=Get-Location
+    $Global:organizationLicenseResultPath= "$Location\LicenseUsageReport "+$DateTime+".csv"
 
     #Get all the license used by the organization.
     Get-MgBetaSubscribedSku | Select-Object  SkuId , ConsumedUnits , @{Name="PurchasedUnits"; Expression={$_.PrepaidUnits.Enabled} } |
@@ -155,7 +156,7 @@ function LicenceUsageReport
     $OrganizationLicenseTotalCostObject = New-Object PSObject -Property $OrganizationLicenseTotalCost
     $OrganizationLicenseTotalCostObject| Select-object 'License Name','Cost','Purchased Units','Consumed Units','Unused Units','Purchased Units Cost','Consumed Units Cost','Unused Units Cost','SkuID' | Export-csv -path $Global:organizationLicenseResultPath  -NoType -Append -Force
     
-    Write-Host "`nLicense usage summary report is stored in $Global:organizationLicenseResultPath .`n" -ForegroundColor Green
+
 }
 
 #Funtion to process the data and export.
@@ -167,7 +168,7 @@ function LicensedUserExport
         [object] $User
     )
 
-    $Global:UserLicenseResultPath= "$PSScriptRoot\UsersLicenseCostReport "+$DateTime+".csv"
+    $Global:UserLicenseResultPath= "$Location\UsersLicenseCostReport "+$DateTime+".csv"
 
     #SignInDateTime
     $LastSignInDateTime=if($User.SignInActivity.LastSignInDateTime)
@@ -377,7 +378,7 @@ function LicensedUserExport
 #Function to Licensed Users.
 function AllLicensedUserReport
 {
-    Write-Host "Processing Users...."
+    Write-Host "Generating license cost report...."
 
     $Global:Count = 0
     #Get all Licensed users.
@@ -387,16 +388,7 @@ function AllLicensedUserReport
         $UserPrincipalName=$_.UserPrincipalName
         LicensedUserExport -AssignedLicenses $_.AssignedLicenses -UserPrincipalName $UserPrincipalName -User $_
     }
-    #Check The file exist or not.
-    if(Test-Path $Global:UserLicenseResultPath –PathType Leaf)
-    {
-    Write-Host "`nAll Licensed User cost report is stored in $Global:UserLicenseResultPath ." -ForegroundColor Green
 
-    }
-    else
-    {
-        Write-Host "There are no users matching the specified filters"
-    }
 
 }
 
@@ -411,7 +403,7 @@ function SelectedUserReport
         Return
     }
 
-    Write-Host "Processing Selected Users....`n"
+    Write-Host "Generating license cost report....`n"
     $Global:Count = 0
 
     #Import the UserId from the given CSV file. 
@@ -425,15 +417,7 @@ function SelectedUserReport
         }
     }
 
-    #Check The file exist or not.
-    if(Test-Path $Global:UserLicenseResultPath –PathType Leaf)
-    {
-        Write-Host "Selected user license cost report is stored in $Global:UserLicenseResultPath .`n" -ForegroundColor Green  
-    }
-    else
-    {
-        Write-Host "There are no users matching the specified filters"
-    }
+  
 }
 
 #--------------------------------------------------------------------------------Main Function Starts--------------------------------------------------------------------------------#
@@ -473,23 +457,35 @@ else
 
 $Prompt = New-Object -ComObject wscript.shell   
 #Check The $Global:UserLicenseResultPath path and open file.
-if(Test-Path $Global:UserLicenseResultPath –PathType Leaf)
-{
-    $UserInput = $Prompt.popup("Do you want to open LicenseUsageReport and UserLicenseCostReport CSV files?",` 0,"Open Output Files",4)   
+if(((Test-Path $Global:UserLicenseResultPath)  -eq "True") -and ((Test-Path $Global:organizationLicenseResultPath) -eq "True"))
+{   
+    Write-Host "`nDetailed license usage and users' license cost reports are stored in: $Location" -ForegroundColor Cyan
+    $UserInput = $Prompt.popup("Do you want to open output files?",` 0,"Open Output Files",4)   
     If ($UserInput -eq 6)
     {   
         Invoke-Item "$Global:organizationLicenseResultPath" ,"$Global:UserLicenseResultPath"
-    } 
+    }
+    
 }
 
-else
+elseif (Test-Path $Global:organizationLicenseResultPath -eq "True")
 {
-    $UserInput = $Prompt.popup("Do you want to open LicenseUsageReport CSV file?",` 0,"Open Output File",4)   
+    Write-Host "`nDetailed license usage & cost report stored in: $Location" -ForegroundColor Cyan
+    $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)   
     If ($UserInput -eq 6)
     {   
         Invoke-Item "$Global:organizationLicenseResultPath"
     }
+    
 }
+else
+{
+ Write-Host "There are no users matching the specified filters"
+}
+
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+    
 
 Disconnect-MgGraph | Out-Null
 
