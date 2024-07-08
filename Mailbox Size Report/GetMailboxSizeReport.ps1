@@ -2,19 +2,20 @@
 =============================================================================================
 Name:           Microsoft 365 Mailbox Size Report
 Description:    This script exports Microsoft 365 mailbox size report to CSV
-Version:        2.0
+Version:        3.0
 Website:        o365reports.com
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~
-1.The script uses modern authentication to connect to Exchange Online.  
-2.The script can be executed with MFA enabled account too.  
-3.Exports report results to CSV. 
-4.You can choose to either “export mailbox size of all mailboxes” or pass an input file to “get usage statistics of specific mailboxes” alone. 
-5.Allows to use filter to get user mailboxes’ size alone 
-6.Allows to use filter to get shared mailboxes’ size alone. 
-7.Automatically installs the EXO (Exchange Online) V2 module (if not installed already) upon your confirmation. 
-8.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
+1.Exports mailbox size report for all mailboxes.
+2.Retrieves mailbox size for list of mailboxes (import CSV)
+3.Allows to use filter to get user mailboxes’ size alone 
+4.Allows to use filter to get shared mailboxes’ size alone. 
+5.Automatically installs the EXO PowerShell module (if not installed already) upon your confirmation. 
+6.The script can be executed with MFA enabled account too.  
+7.Exports report results to CSV. 
+8.The script is scheduler friendly. 
+9.Supports certificate- based authentication (CBA) too. 
 
 For detailed Script execution: https://o365reports.com/2020/10/21/export-office-365-mailbox-size-report-using-powershell/
 ============================================================================================
@@ -22,12 +23,14 @@ For detailed Script execution: https://o365reports.com/2020/10/21/export-office-
 Param
 (
     [Parameter(Mandatory = $false)]
-    [switch]$MFA,
     [switch]$SharedMBOnly,
     [switch]$UserMBOnly,
     [string]$MBNamesFile,
     [string]$UserName,
-    [string]$Password
+    [string]$Password,
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint
 )
 
 Function Get_MailboxSize
@@ -48,44 +51,39 @@ Function Get_MailboxSize
 
 Function main()
 {
- #Check for EXO v2 module inatallation
+ #Check for EXO module inatallation
  $Module = Get-Module ExchangeOnlineManagement -ListAvailable
  if($Module.count -eq 0) 
  { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  Write-Host Exchange Online PowerShell module is not available  -ForegroundColor yellow  
   $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
   if($Confirm -match "[yY]") 
   { 
    Write-host "Installing Exchange Online PowerShell module"
-   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force -Scope CurrentUser
+   Import-Module ExchangeOnlineManagement
   } 
   else 
   { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
  } 
-
- #Connect Exchange Online with MFA
- if($MFA.IsPresent)
+ Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
+ if(($UserName -ne "") -and ($Password -ne ""))
  {
-  Connect-ExchangeOnline
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential
  }
-
- #Authentication using non-MFA
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
+ }
  else
  {
-  #Storing credential in script for scheduling purpose/ Passing credential as parameter
-  if(($UserName -ne "") -and ($Password -ne ""))
-  {
-   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
-   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-  }
-  else
-  {
-   $Credential=Get-Credential -Credential $null
-  }
-  Connect-ExchangeOnline -Credential $Credential
+  Connect-ExchangeOnline -ShowBanner:$false
  }
 
  #Output file declaration 
