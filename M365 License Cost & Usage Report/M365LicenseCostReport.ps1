@@ -468,7 +468,7 @@ if(((Test-Path $Global:UserLicenseResultPath)  -eq "True") -and ((Test-Path $Glo
     
 }
 
-elseif (Test-Path $Global:organizationLicenseResultPath -eq "True")
+elseif ((Test-Path $Global:organizationLicenseResultPath) -eq "True")
 {
     Write-Host "`nDetailed license usage & cost report stored in: $Location" -ForegroundColor Cyan
     $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)   
