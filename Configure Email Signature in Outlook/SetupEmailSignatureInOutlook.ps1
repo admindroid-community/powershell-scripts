@@ -228,7 +228,7 @@ function Get-UsersForAssignSignature
         {
           $Headers = (Import-Csv -Path $Path | Get-Member -MemberType NoteProperty).Name
           $UsersCollection = Import-Csv -Path $Path | Select-Object -Property UserPrincipalName | Sort-Object -Property UserPrincipalName -Unique -ErrorAction Stop
-          if ('UserPrincipalName' -in $Headers -and $UsersCollection.count -gt 1)
+          if ('UserPrincipalName' -in $Headers -and $UsersCollection.count -ge 1)
           {
             $Output = $Output + "to $($UsersCollection.count) users in the CSV file..."
             Write-Host $Output
