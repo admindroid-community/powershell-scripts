@@ -2,7 +2,7 @@
 =============================================================================================
 Name:          Export Conditional Access Policies to Excel using PowerShell  
 Description:   The script exports all Conditional Access policies to an Excel file. 
-Version:       2.0
+Version:       2.2
 Website:       o365reports.com
 
 Script Highlights: 
@@ -98,11 +98,23 @@ Function ConvertTo-Name {
         }
         # Retrieve the display name for the directory object with the given ID
         else{
-        $Name = (Get-MgBetaDirectoryObject -DirectoryObjectId $Id).AdditionalProperties["displayName"]
-        $DirectoryObjsHash[$Id]=$Name
-        }
-        $ConvertedNames += $Name     
-    }
+         try
+         {
+          $Name = ((Get-MgBetaDirectoryObject -DirectoryObjectId $Id ).AdditionalProperties["displayName"] )
+          if($Name -ne $null)
+          {
+           $DirectoryObjsHash[$Id]=$Name
+           $ConvertedNames += $Name
+           
+          }
+         }
+         catch
+         {
+          Write-Host "Deleted object configured in the CA policy $CAName" -ForegroundColor Red
+          Write-Host "Processing CA policies..."
+         }
+        }        
+    } 
      return $ConvertedNames
 }
 
@@ -230,12 +242,12 @@ Get-MgBetaIdentityConditionalAccessPolicy -All | Foreach {
 
  #Convert id to names for Assignment properties
  if($IncludeUsers.Count -ne 0 -and ($IncludeUsers -ne 'All' -and $IncludeUsers -ne 'None' ))
- {
+ { 
   $IncludeUsers=ConvertTo-Name -InputIds $IncludeUsers
  }
  $IncludeUsers=$IncludeUsers -join ","
  
- if($ExcludeUsers.Count -ne 0)# -and ($ExcludeUsers -ne 'GuestsOrExternalUsers'  ))
+ if(($ExcludeUsers.Count -ne 0) -and ($ExcludeUsers -ne 'GuestsOrExternalUsers'  ))
  {
   $ExcludeUsers=ConvertTo-Name -InputIds $ExcludeUsers
  }
