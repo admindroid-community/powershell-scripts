@@ -1,8 +1,16 @@
 ﻿<#
 =============================================================================================
 Name:           Get License Expiry Date report
-Version:        2.0
+Version:        3.0
 Website:        o365reports.com
+
+ChangeLog
+~~~~~~~~~
+
+   V1 - Initial version (04/03/2020)
+   V2 - Minor changes (10/06/2023)
+   V3 - Migrated from MSOnline module to MS Graph (9/13/2024)
+
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~~
@@ -13,7 +21,8 @@ Script Highlights:
 4.Result can be filtered based on subscription status like Enabled, Expired, Disabled, etc. 
 5.Subscription name is shown as user-friendly-name like ‘Office 365 Enterprise E3’ rather than ‘ENTERPRISEPACK’. 
 6.The script can be executed with MFA enabled account too. 
-7.The script is scheduler friendly. i.e., credentials can be passed as a parameter instead of saving inside the script. 
+7.The script is scheduler friendly.
+8.Supports certificate based authentication (CBA) too.
 
 For detailed script execution:  https://o365reports.com/2020/03/04/export-office-365-license-expiry-date-report-powershell/
 ============================================================================================
@@ -26,39 +35,51 @@ Param
     [switch]$Purchased, 
     [Switch]$Expired, 
     [Switch]$Active,
-    [string]$UserName,  
-    [string]$Password 
+    [switch]$CreateSession,
+    [string]$TenantId,
+    [string]$ClientId,
+    [string]$CertificateThumbprint
+
 ) 
 
-#Check for MSOnline module 
-$Module=Get-Module -Name MSOnline -ListAvailable  
-if($Module.count -eq 0) 
-{ 
- Write-Host MSOnline module is not available  -ForegroundColor yellow  
- $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
- if($Confirm -match "[yY]") 
+Function Connect_MgGraph
+{
+ #Check for module installation
+ $Module=Get-Module -Name microsoft.graph.beta -ListAvailable
+ if($Module.count -eq 0) 
  { 
-  Install-Module MSOnline 
-  Import-Module MSOnline
- } 
- else 
- { 
-  Write-Host MSOnline module is required to connect AzureAD.Please install module using Install-Module MSOnline cmdlet. 
-  Exit
+  Write-Host Microsoft Graph PowerShell SDK is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Microsoft Graph PowerShell module..."
+   Install-Module Microsoft.Graph.beta -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
+  }
+  else
+  {
+   Write-Host "Microsoft Graph Beta PowerShell module is required to run this script. Please install module using Install-Module Microsoft.Graph cmdlet." 
+   Exit
+  }
  }
-} 
- 
-#Storing credential in script for scheduling purpose/ Passing credential as parameter  
-if(($UserName -ne "") -and ($Password -ne ""))  
-{  
- $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force  
- $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword  
- Connect-MsolService -Credential $credential 
-}  
-else  
-{  
- Connect-MsolService | Out-Null  
-} 
+ #Disconnect Existing MgGraph session
+ if($CreateSession.IsPresent)
+ {
+  Disconnect-MgGraph
+ }
+
+
+ Write-Host Connecting to Microsoft Graph...
+ if(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
+ {  
+  Connect-MgGraph  -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -NoWelcome
+ }
+ else
+ {
+  Connect-MgGraph -Scopes "Directory.Read.All"  -NoWelcome
+ }
+}
+
+Connect_MgGraph
 
 $Result=""   
 $Results=@()  
@@ -67,7 +88,8 @@ $ShowAllSubscription=$False
 $PrintedOutput=0
 
 #Output file declaration 
-$ExportCSV=".\LicenseExpiryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
+$Location=Get-Location
+$ExportCSV="$Location\LicenseExpiryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 
 #Check for filters
 if((!($Trial.IsPresent)) -and (!($Free.IsPresent)) -and (!($Purchased.IsPresent)) -and (!($Expired.IsPresent)) -and (!($Active.IsPresent)))
@@ -79,13 +101,26 @@ if((!($Trial.IsPresent)) -and (!($Free.IsPresent)) -and (!($Purchased.IsPresent)
 $FriendlyNameHash=@()
 $FriendlyNameHash=Get-Content -Raw -Path .\LicenseFriendlyName.txt -ErrorAction Stop | ConvertFrom-StringData 
 
+
+#Get next lifecycle date
+$ExpiryDateHash=@{}
+$LifeCycleDateInfo=(Invoke-MgGraphRequest -Uri https://graph.microsoft.com/V1.0/directory/subscriptions -Method Get).Value
+foreach($Date in $LifeCycleDate)
+{
+ $ExpiryDateHash.Add($Date.skuId,$Date.nextLifeCycleDateTime)
+}
+
 #Get available subscriptions in the tenant
-$Subscriptions= Get-MsolSubscription | foreach{
+$Subscriptions= Get-MgBetaSubscribedSku -All | foreach{
  $SubscriptionName=$_.SKUPartNumber
- $SubscribedOn=$_.DateCreated
- $ExpiryDate=$_.NextLifeCycleDate
- $Status=$_.Status
- $TotalLicenses=$_.TotalLicenses
+ $SkuId=$_.SkuId
+ $ConsumedUnits=$_.ConsumedUnits
+ $MoreSkuDetails=$LifeCycleDateInfo | Where {$_.skuId -eq $SkuId}
+ $SubscribedOn=$MoreSkuDetails.createdDateTime
+ $Status=$MoreSkuDetails.status
+ $TotalLicenses=$MoreSkuDetails.totalLicenses
+ $ExpiryDate=$MoreSkuDetails.nextLifeCycleDateTime
+ $RemainingUnits=$TotalLicenses - $ConsumedUnits
  $Print=0
 
  #Convert Skuid to friendly name  
@@ -99,7 +134,7 @@ $Subscriptions= Get-MsolSubscription | foreach{
  {
   $NamePrint=$EasyName
  } 
-
+ 
  #Convert Subscribed date to friendly subscribed date
  $SubscribedDate=(New-TimeSpan -Start $SubscribedOn -End (Get-Date)).Days
  if($SubscribedDate -eq 0)
@@ -114,22 +149,19 @@ $Subscriptions= Get-MsolSubscription | foreach{
  $SubscribedDate="$SubscribedOn $SubscribedDate"
 
  #Determine subscription type
- If($_.IsTrial -eq $False)
- {
-  if(($SubscriptionName -like "*Free*") -or ($ExpiryDate -eq $null))
+  if(($SubscriptionName -like "*Free*") -and ($ExpiryDate -eq $null))
   {
    $SubscriptionType="Free"
   }
-  else
+  elseif($ExpiryDate -eq $null)
   {
-   $SubscriptionType="Purchased"
+   $SubscriptionType="Trial"
   }
- }
  else
  {
-  $SubscriptionType="Trial"
+  $SubscriptionType="Purchased"
  }
-
+ 
  #Friendly Expiry Date
  if($ExpiryDate -ne $null)
  {
@@ -156,7 +188,7 @@ $Subscriptions= Get-MsolSubscription | foreach{
   $ExpiryDate="-"
   $FriendlyExpiryDate="Never Expires"
  }
-
+ 
  #Check for filters
  if($ShowAllSubscription -eq $true)
  {
@@ -192,9 +224,9 @@ $Subscriptions= Get-MsolSubscription | foreach{
  if($Print -eq 1)
  {
   $PrintedOutput++
-  $Result=@{'Subscription Name'=$SubscriptionName;'Friendly Subscription Name'=$NamePrint;'Subscribed Date'=$SubscribedDate;'Total Licenses'=$TotalLicenses;'License Expiry Date/Next LifeCycle Activity Date'=$ExpiryDate;'Friendly Expiry Date'=$FriendlyExpiryDate;'Subscription Type'=$SubscriptionType;'Status'=$Status}
+  $Result=@{'Subscription Name'=$SubscriptionName;'SKU Id'=$SkuId;'Friendly Subscription Name'=$NamePrint;'Subscribed Date'=$SubscribedDate;'Total Units'=$TotalLicenses;'Consumed Units'=$ConsumedUnits;'Remaining Units'=$RemainingUnits;'License Expiry Date/Next LifeCycle Activity Date'=$ExpiryDate;'Friendly Expiry Date'=$FriendlyExpiryDate;'Subscription Type'=$SubscriptionType;'Status'=$Status}
   $Results= New-Object PSObject -Property $Result  
-  $Results | Select-Object 'Subscription Name','Friendly Subscription Name','Subscribed Date','Total Licenses','Subscription Type','License Expiry Date/Next LifeCycle Activity Date','Friendly Expiry Date','Status' | Export-Csv -Path $ExportCSV -Notype -Append 
+  $Results | Select-Object 'Subscription Name','Friendly Subscription Name','Subscribed Date','Total Units','Consumed Units','Remaining Units','Subscription Type','License Expiry Date/Next LifeCycle Activity Date','Friendly Expiry Date','Status','SKU Id' | Export-Csv -Path $ExportCSV -Notype -Append 
  }
 }
 
@@ -205,8 +237,7 @@ if((Test-Path -Path $ExportCSV) -eq "True")
  Write-Host " Office 365 license expiry report available in:"  -NoNewline -ForegroundColor Yellow
  Write-Host $ExportCSV 
  Write-Host ""
- Write-Host " The Output file contains:" -NoNewline -ForegroundColor Yellow
- Write-Host $PrintedOutput subscriptions  
+ Write-Host " The Output file contains:" $PrintedOutput subscriptions  
  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
 Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
  $Prompt = New-Object -ComObject wscript.shell 
