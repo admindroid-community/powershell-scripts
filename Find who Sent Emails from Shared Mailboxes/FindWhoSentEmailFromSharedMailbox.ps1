@@ -2,21 +2,29 @@
 =============================================================================================
 Name:           Find who sent email from shared mailbox
 Description:    This script finds who sent emails from shared mailbox
-Version:        1.0
+Version:        3.0
 Website:        o365reports.com
+
+Change Log
+~~~~~~~~~~
+
+    V1 (11/5/22) - Initial version 
+    V2 (9/28/23) - Minor changes
+    V2 (9/18/24) - Added support for certificate-based authentication and extended audit log retrieval perid from 90 to 180 days 
+
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~~
 
-1.The script uses modern authentication to retrieve audit logs.    
-2.The script can be executed with an MFA-enabled account too.    
-3.Exports report results to CSV file.    
-4.Helps to generate audit reports for custom periods.  
-5.Tracks email sent activities from a specific shared mailbox. 
-6.Allows to audit send as activities separately. 
-7.Allows to track send on behalf activities separately. 
-8.Automatically installs the EXO V2 (if not installed already) upon your confirmation.   
-9.The script is scheduler-friendly.i.e., Credentials can be passed as a parameter. 
+1.Helps to generate audit reports for custom periods.  
+2.Tracks email sent activities from a specific shared mailbox. 
+3.Allows to audit send as activities separately. 
+4.Allows to track send on behalf activities separately. The script uses modern authentication to retrieve audit logs.    
+5.Exports report results to CSV file.   
+6.Automatically installs the EXO module (if not installed already) upon your confirmation. 
+7.The script can be executed with an MFA-enabled account too.    
+8.Supports Certificate-based Authentication (CBA) too
+9.The script is scheduler-friendly.
 
 For detailed script execution: https://o365reports.com/2022/05/11/find-who-sent-email-from-shared-mailbox-in-office-365-using-powershell
 ============================================================================================
@@ -29,58 +37,28 @@ Param
     [string]$SharedMBIdentity,
     [switch]$SendAsOnly,
     [Switch]$SendOnBehalfOnly,
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint,
     [string]$UserName,
     [string]$Password
 )
 
-Function Connect_Exo
-{
- #Check for EXO v2 module inatallation
- $Module = Get-Module ExchangeOnlineManagement -ListAvailable
- if($Module.count -eq 0) 
- { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
-  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
-  if($Confirm -match "[yY]") 
-  { 
-   Write-host "Installing Exchange Online PowerShell module"
-   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
-   Import-Module ExchangeOnlineManagement
-  } 
-  else 
-  { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
-   Exit
-  }
- } 
- Write-Host Connecting to Exchange Online...
- #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
- if(($UserName -ne "") -and ($Password -ne ""))
- {
-  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
-  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-  Connect-ExchangeOnline -Credential $Credential
- }
- else
- {
-  Connect-ExchangeOnline
- }
-}
+$MaxStartDate=((Get-Date).AddDays(-179)).Date
 
-$MaxStartDate=((Get-Date).AddDays(-89)).Date
 
-#Getting SendAs emails for past 90 days
+#Retrive audit log for the past 180 days
 if(($StartDate -eq $null) -and ($EndDate -eq $null))
 {
  $EndDate=(Get-Date).Date
  $StartDate=$MaxStartDate
 }
-#Getting start date to audit sendas emails report
+#Getting start date to audit export report
 While($true)
 {
  if ($StartDate -eq $null)
  {
-  $StartDate=Read-Host Enter start time for report generation '(Eg:04/28/2021)'
+  $StartDate=Read-Host Enter start time for report generation '(Eg:12/15/2023)'
  }
  Try
  {
@@ -91,7 +69,7 @@ While($true)
   }
   else
   {
-   Write-Host `nAudit can be retrieved only for past 90 days. Please select a date after $MaxStartDate -ForegroundColor Red
+   Write-Host `nAudit can be retrieved only for the past 180 days. Please select a date after $MaxStartDate -ForegroundColor Red
    return
   }
  }
@@ -102,12 +80,12 @@ While($true)
 }
 
 
-#Getting end date to audit sendas emails report
+#Getting end date to export audit report
 While($true)
 {
  if ($EndDate -eq $null)
  {
-  $EndDate=Read-Host Enter End time for report generation '(Eg: 04/28/2021)'
+  $EndDate=Read-Host Enter End time for report generation '(Eg: 12/15/2023)'
  }
  Try
  {
@@ -125,7 +103,46 @@ While($true)
  }
 }
 
-$OutputCSV=".\AuditWhoSentEmailsFromSharedMailbox_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
+
+Function Connect_Exo
+{
+ #Check for EXO module inatallation
+ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
+ if($Module.count -eq 0) 
+ { 
+  Write-Host Exchange Online PowerShell  module is not available  -ForegroundColor yellow  
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+  if($Confirm -match "[yY]") 
+  { 
+   Write-host "Installing Exchange Online PowerShell module"
+   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
+  } 
+  else 
+  { 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Exit
+  }
+ } 
+ Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
+ if(($UserName -ne "") -and ($Password -ne ""))
+ {
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential -ShowBanner:$false
+ }
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
+ }
+ else
+ {
+  Connect-ExchangeOnline -ShowBanner:$false
+ }
+}
+
+$Location=Get-Location
+$OutputCSV="$Location\AuditWhoSentEmailsFromSharedMailbox_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 $IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
 $CurrentStart=$StartDate
 $CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
@@ -165,6 +182,7 @@ else
   exit
  }
 }
+
 
 #Check for SendAs and SendOnBehalf filter
 if($SendAsOnly.IsPresent)
@@ -278,10 +296,15 @@ while($true)
 If($OutputEvents -eq 0)
 {
  Write-Host No records found
+
+ Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
 }
 else
 {
  Write-Host `nThe output file contains $OutputEvents audit records `n
+ Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
  if((Test-Path -Path $OutputCSV) -eq "True") 
  {
   Write-Host " The Output file availble in:" -NoNewline -ForegroundColor Yellow 
@@ -298,5 +321,4 @@ else
 
 #Disconnect Exchange Online session
 Disconnect-ExchangeOnline -Confirm:$false -InformationAction Ignore -ErrorAction SilentlyContinue
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green 
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n 
+  
