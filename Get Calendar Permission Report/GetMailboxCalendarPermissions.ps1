@@ -1,8 +1,9 @@
 ﻿<#
 =============================================================================================
-Name:           Export Office 365 mailbox calendar permission Report 
+Name:           Export calendar permission Report for Exchange Online Mailboxes
+Version:        2.0
 Website:        o365reports.com
-
+    
 
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~
@@ -19,6 +20,15 @@ Script Highlights:
 11. The script is scheduler-friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
 
 For detailed Script execution: https://o365reports.com/2021/11/02/get-calendar-permissions-report-for-office365-mailboxes-powershell
+
+
+Change Log
+~~~~~~~~~~
+
+    V1.0 (Nov 02, 2021) - File created
+    V1.1 (Sep 28, 2023) - Minor changes
+    V2.0 (Oct 14, 2024) - Updated the script to use REST based cmdlets and added certificate-based authentication support to enhance scheduling capability
+    
 ============================================================================================
 #>
 param (
@@ -28,16 +38,19 @@ param (
     [String] $DisplayAllCalendarsSharedTo,
     [Switch] $DefaultCalendarPermissions,
     [Switch] $ExternalUsersCalendarPermissions,
-    [String] $CSVIdentityFile    
+    [String] $CSVIdentityFile,
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint
 )
 
 Function Connect_Exo
 {
- #Check for EXO v2 module inatallation
+ #Check for EXO module inatallation
  $Module = Get-Module ExchangeOnlineManagement -ListAvailable
  if($Module.count -eq 0) 
  { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  Write-Host Exchange Online PowerShell  module is not available  -ForegroundColor yellow  
   $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
   if($Confirm -match "[yY]") 
   { 
@@ -46,7 +59,7 @@ Function Connect_Exo
   } 
   else 
   { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
  } 
@@ -56,13 +69,18 @@ Function Connect_Exo
  {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-  Connect-ExchangeOnline -Credential $Credential
+  Connect-ExchangeOnline -Credential $Credential -ShowBanner:$false
+ }
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
  }
  else
  {
-  Connect-ExchangeOnline
+  Connect-ExchangeOnline -ShowBanner:$false
  }
 }
+
 
 Function OutputFile_Declaration
 {
@@ -96,7 +114,7 @@ Function RetrieveMBs
   $IdentityList = Import-Csv -Header "IdentityValue" $CSVIdentityFile
   foreach ($Identity in $IdentityList) {
    $CurrIdentity = $Identity.IdentityValue
-   $CurrUserData = Get-Mailbox -identity $currIdentity -ErrorAction SilentlyContinue 
+   $CurrUserData = Get-EXOMailbox -identity $currIdentity -ErrorAction SilentlyContinue 
    if ($null -eq $CurrUserData) 
    {
     Write-Host $currIdentity mailbox is not found/invalid.
@@ -109,7 +127,7 @@ Function RetrieveMBs
  }
  else 
  {
-  Get-Mailbox -ResultSize Unlimited | ForEach-Object {
+  Get-EXOMailbox -ResultSize Unlimited | ForEach-Object {
    $CurrUserData = $_
    GetCalendars
   }
@@ -122,7 +140,7 @@ Function GetCalendars
  $EmailAddress = $CurrUserData.PrimarySmtpAddress
  $global:DisplayName=$CurrUserData.DisplayName
  $CalendarFolders=@()
- $CalendarStats = Get-MailboxFolderStatistics -Identity $EmailAddress -FolderScope Calendar
+ $CalendarStats = Get-EXOMailboxFolderStatistics -Identity $EmailAddress -FolderScope Calendar
  
  #Processing the calandar folder path
  ForEach($LiveCalendarFolder in $CalendarStats) 
@@ -155,7 +173,7 @@ Function RetrieveCalendarPermissions
   {
    $CalendarName=$CalendarFolder -split "\\" | Select-Object -Last 1
    Write-Progress "Checking calendar permission in: $CalendarFolder" "Processed mailbox count: $global:MailboxCount"
-   $CurrCalendarData = Get-MailboxFolderPermission -Identity $CalendarFolder -User $CurrMailboxData.PrimarySmtpAddress -ErrorAction SilentlyContinue 
+   $CurrCalendarData = Get-EXOMailboxFolderPermission -Identity $CalendarFolder -User $CurrMailboxData.PrimarySmtpAddress -ErrorAction SilentlyContinue 
    if ($null -ne $CurrCalendarData) 
    {
     SaveCalendarPermissionsData
@@ -170,7 +188,7 @@ Function RetrieveCalendarPermissions
   {
    $CalendarName=$CalendarFolder -split "\\" | Select-Object -Last 1
    Write-Progress "Checking calendar permission in: $CalendarFolder" "Processed mailbox count: $global:MailboxCount"
-   Get-MailboxFolderPermission -Identity $CalendarFolder | foreach {
+   Get-EXOMailboxFolderPermission -Identity $CalendarFolder | foreach {
     $CurrCalendarData=$_
     SaveCalendarPermissionsData
    }
@@ -185,7 +203,7 @@ Function RetrieveCalendarPermissions
   {
    Write-Progress "Checking default calendar permission for $CalendarFolder" "Processed mailbox count: $global:MailboxCount"
    $CalendarName=$CalendarFolder -split "\\" | Select-Object -Last 1
-   $CurrCalendarData= Get-MailboxFolderPermission -Identity $CalendarFolder | where-Object { $_.User.ToString() -eq "Default" } #| foreach-object {
+   $CurrCalendarData= Get-EXOMailboxFolderPermission -Identity $CalendarFolder | where-Object { $_.User.ToString() -eq "Default" } #| foreach-object {
    SaveCalendarPermissionsData
   } 
  }
@@ -198,7 +216,7 @@ Function RetrieveCalendarPermissions
   {
    Write-Progress "Checking default calendar permission for $CalendarFolder" "Processed mailbox count: $global:MailboxCount"
    $CalendarName=$CalendarFolder -split "\\" | Select-Object -Last 1
-   Get-MailboxFolderPermission -Identity $CalendarFolder | where-Object { $_.User.DisplayName.StartsWith("ExchangePublishedUser.") }  | foreach-object {
+   Get-EXOMailboxFolderPermission -Identity $CalendarFolder | where-Object { $_.User.DisplayName.StartsWith("ExchangePublishedUser.") }  | foreach-object {
    $CurrCalendarData=$_
    SaveCalendarPermissionsData
    }
@@ -212,7 +230,7 @@ Function RetrieveCalendarPermissions
   {
    Write-Progress "Checking calendar permission for $CalendarFolder" "Processed mailbox count: $global:MailboxCount"
    $CalendarName=$CalendarFolder -split "\\" | Select-Object -Last 1
-   Get-MailboxFolderPermission -Identity $CalendarFolder | where-Object { ($_.User.ToString() -ne "Default" -and $_.User.ToString() -ne "Anonymous")  }  | foreach-object {
+   Get-EXOMailboxFolderPermission -Identity $CalendarFolder | where-Object { ($_.User.ToString() -ne "Default" -and $_.User.ToString() -ne "Anonymous")  }  | foreach-object {
     $CurrCalendarData=$_
 	SaveCalendarPermissionsData
    }
@@ -291,7 +309,7 @@ $global:MailboxCount = 0
 $global:ReportSize = 0
 if ($DisplayAllCalendarsSharedTo -ne "") 
 {
- $CurrMailboxData = Get-Mailbox -Identity $DisplayAllCalendarsSharedTo -ErrorAction SilentlyContinue 
+ $CurrMailboxData = Get-EXOMailbox -Identity $DisplayAllCalendarsSharedTo -ErrorAction SilentlyContinue 
  if ($CurrMailboxData -eq $null) 
  {
   Write-Host "Given email address is invalid. Exiting from execution." -ForegroundColor Magenta
