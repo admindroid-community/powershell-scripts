@@ -151,7 +151,7 @@ Function Get_UsersLicenseInfo
         #Increment SKUid count
         $count++
      }
-     $Output=[PSCustomObject]@{'Displayname'=$_.Displayname;'UserPrincipalName'=$UPN;Country=$Country;'LicensePlanWithEnabledService'=$LicensePlanWithEnabledService;'FriendlyNameOfLicensePlanAndEnabledService'=$FriendlyNameOfLicensePlanWithService}
+     $Output=[PSCustomObject]@{'Displayname'=$_.Displayname;'UserPrincipalName'=$UPN;'Country'=$Country;'LicensePlanWithEnabledService'=$LicensePlanWithEnabledService;'FriendlyNameOfLicensePlanAndEnabledService'=$FriendlyNameOfLicensePlanWithService}
      $Output | Export-Csv -path $ExportSimpleCSV -NoTypeInformation -Append
 }
 function CloseConnection
