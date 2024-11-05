@@ -17,7 +17,17 @@ Script Highlights:
 8. The script is scheduler-friendly, making it easy to automate.
 9. It supports certificate-based authentication (CBA) too. 
 
+Change Log:
+~~~~~~~~~~
+
+  V1.0 (July 3, 2024) - File created
+  V1.1 (Nov 04, 2024) - Scope updation to resolve permission issue
+
+
 For detailed Script execution: : https://o365reports.com/2024/06/26/identity-mfa-deployment-source-in-microsoft-365-using-powershell/
+
+
+
 ============================================================================================
 #>
 param 
@@ -178,7 +188,7 @@ try
     }
     else
     {
-        Connect-MgGraph -Scopes 'User.Read.All','Policy.Read.all','Policy.ReadWrite.SecurityDefaults','Team.ReadBasic.All','Directory.Read.All' -NoWelcome
+        Connect-MgGraph -Scopes 'User.Read.All','Policy.Read.all','Policy.ReadWrite.SecurityDefaults','Team.ReadBasic.All','Directory.Read.All','AuditLog.Read.All' -NoWelcome
         Write-Host Connected to Microsoft Graph PowerShell using (Get-MgContext).Account account -ForegroundColor Yellow
     }
 }
