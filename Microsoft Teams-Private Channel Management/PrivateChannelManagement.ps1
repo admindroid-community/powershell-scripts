@@ -1,11 +1,9 @@
 ﻿<#
 =============================================================================================
-Name:           PrivateChannelManagement
+Name:           Private Channel Management & Reporting Using PowerShell
 Description:    This script performs Private Channel related management actions and reporting
-Version:        1.0
-Released date:  18/11/2019
-website:        blog.admindroid.com
-Script by:      AdminDroid Team (Proud Creators of AdminDroid Office 365 Reporting Tool)
+Version:        2.0
+Script by:      AdminDroid Team 
 
 
 To run the script
@@ -14,8 +12,20 @@ To run the script
 To schdeule/run the script by explicitly mentioning credential
 ./PrivateChannelManagement.ps1 -UserName <UserName> -Password <Password>
 
-To run the script with MFA enabled account
-./PrivateChannelManagement.ps1 -MFA
+To run the script with certificate based authentication
+./PrivateChannelManagement.ps1 -TenantId <TenantId> -AppId <AppId> -CertificateThumbPrint <CertThumbPrint>
+
+To run a specific action directly
+./PrivateChannelManagement.ps1 -Action 7
+
+
+Change Log
+~~~~~~~~~~
+ V1.0 (Nov 18, 2019) - File created
+ V2.0 (Nov 13, 2024) - Added support for certificate-based authentication, removed older PowerShell modules, and a few minor usability enhancements
+
+
+For detailed script execution steps: https://blog.admindroid.com/managing-private-channels-in-microsoft-teams/
 ============================================================================================
 #>
 
@@ -23,97 +33,86 @@ To run the script with MFA enabled account
 param(
 [string]$UserName, 
 [string]$Password, 
-[switch]$MFA,
+[string]$TenantId,
+[string]$AppId,
+[string]$CertificateThumbprint,
 [int]$Action
 ) 
 
 
-#install latest Microsoft Teams module from PowerShell Test Gallery
-$Module=Get-Module -Name MicrosoftTeams -ListAvailable  
-if($Module.count -eq 0) 
-{   
- $Confirm= Read-Host Are you sure you want to install Microsoft Teams module? [Y] Yes [N] No 
- if($Confirm -match "[y]") 
- { 
-  Register-PSRepository -Name PSGalleryInt -SourceLocation https://www.poshtestgallery.com/ -InstallationPolicy Trusted
-  Install-Module -Name MicrosoftTeams -Repository PSGalleryInt -Force
-  Write-Host Installing Microsoft Teams Module...
- }
- else
- {
-  Write-Host `nNeed Microsoft Teams PowerShell module. Please install the latest module from PowerShell Test Gallery -ForegroundColor Yellow
-  exit
- }
-}
-#Check for latest Microsoft Teams PowerShell Module
-elseif((Get-module -Name MicrosoftTeams -ListAvailable).version -lt "1.0.18")
+Function MSTeam_PSModule
 {
- Write-Host `nTo manage Private Channel, you must install lastest version of MicrosoftTeams PowerShell module from PowerShell Test Gallery
- $Confirm= Read-Host `nAre you sure you want to uninstall old version ? [Y] Yes [N] No 
- if($Confirm -match "[y]") 
- { 
-  Uninstall-Module -Name MicrosoftTeams
+ #Check for MS Teams PowerShell module availability
+ $Module=Get-Module -Name MicrosoftTeams -ListAvailable 
+ if($Module.count -eq 0)
+ {
+  Write-Host MicrosoftTeams module is not available  -ForegroundColor yellow 
+  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
+  if($Confirm -match "[yY]")
+  {
+   Install-Module MicrosoftTeams -Scope CurrentUser
+  }
+  else
+  {
+   Write-Host MicrosoftTeams module is required.Please install module using Install-Module MicrosoftTeams cmdlet.
+   Exit
+  }
+ }
+ Write-Host Connecting to Microsoft Teams... -ForegroundColor Yellow
+
+
+ #Authentication using non-MFA
+
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter
+ if(($UserName -ne "") -and ($Password -ne ""))
+ {
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
+  $Team=Connect-MicrosoftTeams -Credential $Credential
+ }
+ elseif(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
+ {  
+  $Team=Connect-MicrosoftTeams  -TenantId $TenantId -ApplicationId $AppId -CertificateThumbprint $CertificateThumbprint 
  }
  else
- {
-  Write-Host Please install latest version of Microsoft Teams PowerShell module from PowerShell Test Gallery -ForegroundColor Yellow
-  exit
+ {  
+  $Team=Connect-MicrosoftTeams
  }
- $Confirm= Read-Host `nAre you sure you want to install latest version of Microsoft Teams module? [Y] Yes [N] No 
- if($Confirm -match "[y]") 
- { 
-  Register-PSRepository -Name PSGalleryInt -SourceLocation https://www.poshtestgallery.com/ -InstallationPolicy Trusted
-  Install-Module -Name MicrosoftTeams -Repository PSGalleryInt -Force
-  Write-Host Installing Microsoft Teams Module...
- }
- else
+
+
+ #Check for Teams connectivity
+ If($Team -eq $null)
  {
-  Write-Host `nPlease install latest version of Microsoft Teams PowerShell module from PowerShell Test Gallery -ForegroundColor Yellow
+  Write-Host Error occurred while creating Teams session. Please try again -ForegroundColor Red
   exit
  }
 }
 
+Function Open_Output
+{
+  if((Test-Path -Path $Path) -eq "True") 
+ {
+  Write-Host `nThe exported report available in: -NoNewline -Foregroundcolor Yellow; Write-Host $ExportCSV
 
-#Check Skype for Business Online module
-$Module=Get-Module -Name SkypeOnlineConnector -ListAvailable 
-if($Module.count -eq 0) 
-{ 
- Write-Host  `nPlease install Skype for Business Online PowerShell Module  -ForegroundColor yellow  
- Write-Host `nYou can download the Skype Online PowerShell module directly using below url: https://download.microsoft.com/download/2/0/5/2050B39B-4DA5-48E0-B768-583533B42C3B/SkypeOnlinePowerShell.Exe 
- Write-Host `nAfter installing module, Please close all existing PowerShell sessions. Start new PowerShell console and rerun this script.
- exit
-} 
-Write-Host Preparing required PowerShell Modules...
-Get-PSSession | Remove-PSSession
-#Authentication using MFA
-if($MFA.IsPresent) 
-{ 
- Write-Host Importing Skype for Business Online PowerShell Module...
- $sfbSession = New-CsOnlineSession 
- Import-PSSession $sfbSession -AllowClobber | Out-Null 
- Write-Host Importing Microsoft Teams PowerShell Module...
- Connect-MicrosoftTeams | Out-Null
-} 
+  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+ 
+   $Prompt = New-Object -ComObject wscript.shell   
+  $UserInput = $Prompt.popup("Do you want to open output file?",`   
+ 0,"Open Output File",4)   
+  If ($UserInput -eq 6)   
+  {   
+   Invoke-Item "$Path"   
+  } 
+ }
+ else
+ {
+  Write-Host No data found.
+ }
+}
 
-#Authentication using non-MFA
-else 
-{ 
- #Storing credential in script for scheduling purpose/ Passing credential as parameter 
- if(($UserName -ne "") -and ($Password -ne "")) 
- { 
-  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force 
-  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword 
- } 
- else 
- { 
-  $Credential=Get-Credential -Credential $null 
- } 
- Write-Host Importing Skype for Business Online PowerShell Module...
- $sfbSession = New-CsOnlineSession -Credential $Credential 
- Import-PSSession $sfbSession -AllowClobber -WarningAction SilentlyContinue | Out-Null 
- Write-Host Importing Microsoft Teams PowerShell Module...
- Connect-MicrosoftTeams -Credential $Credential | Out-Null
-} 
+MSTeam_PSModule
+$Location=Get-Location
 [boolean]$Delay=$false
 Do {
  if($Action -eq "")
@@ -187,7 +186,7 @@ Do {
      {
       New-CsTeamsChannelsPolicy -Identity "Allow Private Channel Creation" -AllowPrivateChannelCreation $True
      }
-     Write-Host `nThe file must follow the format: Users"'" UPN separated by new line without header -ForegroundColor Magenta
+     Write-Host `nThe file must follow the format: Users"'" UPN separated by new line -ForegroundColor Magenta
      $UserNamesFile=Read-Host Enter CSV/txt file path"(Eg:C:\Users\Desktop\UserNames.txt)"
      $Users=@()
      $Users=Import-Csv -Header "UserPrincipalName" $UserNamesFile
@@ -223,13 +222,13 @@ Do {
    7 {
       $Result=""  
       $Results=@() 
-      $Path="./AllPrivateChannels_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
+      $Path="$Location/PrivateChannelsReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
       Write-Host Exporting Private Channels report...
       $Count=0
       Get-Team | foreach {
       $TeamName=$_.DisplayName
-      Write-Progress -Activity "`n     Processed Teams count: $Count "`n"  Currently Processing: $TeamName"
       $Count++
+      Write-Progress -Activity "`n     Processed Teams count: $Count "`n"  Currently Processing: $TeamName"
       $GroupId=$_.GroupId
       $PrivateChannels=(Get-TeamChannel -GroupId $GroupId -MembershipType Private).DisplayName
       foreach($PrivateChannel in $PrivateChannels)
@@ -240,22 +239,16 @@ Do {
       }
      }
      Write-Progress -Activity "`n     Processed Teams count: $Count "`n"  Currently Processing: $TeamName" -Completed
-     if((Test-Path -Path $Path) -eq "True") 
-     {
-      Write-Host `nReport available in $Path -ForegroundColor Green
-     }
+     Open_Output
     }  
 
    8 {
       $TeamName=Read-Host Enter Teams name "(Case Sensitive)":
       Write-Host Exporting Private Channel report...
       $GroupId=(Get-Team -DisplayName $TeamName).GroupId
-      $Path=".\Private Channels available in $TeamName$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
+      $Path="$Location\Private Channels available in $TeamName$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
       Get-TeamChannel -GroupId $GroupId -MembershipType Private | select DisplayName | Export-Csv $Path -NoTypeInformation
-      if((Test-Path -Path $Path) -eq "True") 
-      {
-       Write-Host `nReport available in $Path -ForegroundColor Green
-      }
+       Open_Output
      }
 
    9{
@@ -263,15 +256,15 @@ Do {
      $Results=@() 
      Write-Host Exporting all Private Channel"'s" Members and Owners report...
      $Count=0
-     $Path="./AllPrivateChannels Members and Owners Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
+     $Path="$Location/AllPrivateChannels Members and Owners Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
      Get-Team | foreach {
       $TeamName=$_.DisplayName
       $GroupId=$_.GroupId
       $PrivateChannels=(Get-TeamChannel -GroupId $GroupId -MembershipType Private).DisplayName
       foreach($PrivateChannel in $PrivateChannels)
       {
-       Write-Progress -Activity "`n     Processed Private Channel count: $Count "`n"  Currently Processing: $PrivateChannel"
        $Count++
+       Write-Progress -Activity "`n     Processed Private Channel count: $Count "`n"  Currently Processing: $PrivateChannel"
        Get-TeamChannelUser -GroupId $GroupId -DisplayName $PrivateChannel | foreach {
         $Name=$_.Name
         $UPN=$_.User
@@ -283,10 +276,7 @@ Do {
       }    
      }
      Write-Progress -Activity "`n     Processed Private Channel count: $Count "`n"  Currently Processing: $PrivateChannel" -Completed
-     if((Test-Path -Path $Path) -eq "True") 
-     {
-      Write-Host `nReport available in $Path -ForegroundColor Green
-     }
+   Open_Output
     }    
 
    10 {
@@ -296,7 +286,7 @@ Do {
     $ChannelName=Read-Host Enter Private Channel name
     $GroupId=(Get-Team -DisplayName $TeamName).GroupId 
     Write-Host Exporting $ChannelName"'s" Members and Owners report...
-    $Path=".\MembersOf $ChannelName$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
+    $Path="$Location\MembersOf $ChannelName$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
     Get-TeamChannelUser -GroupId $GroupId -DisplayName $ChannelName | foreach {
      $Name=$_.Name
      $UPN=$_.User
@@ -305,15 +295,14 @@ Do {
      $Results= New-Object psobject -Property $Result
      $Results | select 'Teams Name','Private Channel Name',UPN,'User Display Name',Role | Export-Csv $Path -NoTypeInformation -Append
     }   
-    if((Test-Path -Path $Path) -eq "True") 
-    {
-     Write-Host `nReport available in $Path -ForegroundColor Green
-    }
+     Open_Output
    }
   }
   if($Action -ne "")
   {exit}
  }
   While ($i -ne 0)
-  Clear-Host
+
+
  
+
