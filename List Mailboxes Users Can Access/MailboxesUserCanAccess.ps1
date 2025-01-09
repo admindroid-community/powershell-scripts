@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:           List all Exchange Online mailboxes users can access
-Version:        1.0
+Version:        2.0
 Website:        m365scripts.com
 Script by:      M365Scripts Team
 
@@ -15,6 +15,16 @@ Script Highlights:
 6.The script is scheduler-friendly. i.e., credentials are passed as parameters, so worry not!
 
 For detailed script execution: https://m365scripts.com/exchange-online/URL Sluglist-exchange-online-mailboxes-user-has-access-using-powershell
+
+
+
+Change Log:
+
+V1.0 (Apr 27, 2022)- Script created
+v1.1 (Jun 29, 2022)- Error handling added
+v1.3 (July 3, 2024)- Usability added
+V2.0 (Jan 09, 2025)- Due to MS update, GUID shown instead of name in the Identity. Updated the script to show name.
+
 ============================================================================================
 #>
 Param
@@ -117,8 +127,8 @@ if (($UPN -ne "")) {
 elseif (($CSV -ne "")) {
     Import-Csv $CSV -ErrorAction Stop | ForEach-Object {
         $UPN = $_.UPN
-        $UserInfo = $global:Mailbox | Where-Object { $_.UserPrincipalName -eq "$UPN" } | Select-Object Identity
-        $Identity = $UserInfo.Identity
+        $UserInfo = $global:Mailbox | Where-Object { $_.UserPrincipalName -eq "$UPN" } 
+        $Identity = $UserInfo.Displayname
         Write-Progress "Processing for the Mailbox: $Identity"
         if ($FullAccess.IsPresent) {
             FullAccess
@@ -141,8 +151,8 @@ else {
     $global:Mailbox | ForEach-Object {
         $MBCount = $MBCount + 1
         $UPN = $_.UserPrincipalName
-        $Identity = $_.Identity
-        Write-Progress -Activity "Processing for  : $Identity" -Status "Processing mailbox Count: $MBCount" 
+        $Identity = $_.DisplayName
+        Write-Progress -Activity "Processing for  : $Identity" -Status "Processed mailbox Count: $MBCount" 
         if ($FullAccess.IsPresent) {
             FullAccess
         }
