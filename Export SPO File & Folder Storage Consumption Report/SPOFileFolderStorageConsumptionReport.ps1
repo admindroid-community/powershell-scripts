@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:           Export SharePoint Online File & Folder Storage Usage Report Using PowerShell 
-Version:        1.0
+Version:        2.0
 Website:        o365reports.com
 
 ~~~~~~~~~~~~~~~~~~
@@ -18,6 +18,11 @@ Script Highlights:
 9. It can be executed with certificate-based authentication (CBA) too. 
 
 For detailed script execution: https://o365reports.com/2024/08/07/export-sharepoint-online-file-folder-storage-usage-report-using-powershell/
+
+Change Log:
+
+V1.0 (Aug 08, 2024)- Script created
+V2.0 (Jan 15, 2025)- Due to PnP app regsitration removed, added support for passing ClientId during script execution.
 ============================================================================================
 #>
 Param
@@ -68,7 +73,7 @@ Function Connection-Module{
     }
     else
     {
-        Connect-PnPOnline -Url $Url -Interactive   
+        Connect-PnPOnline -Url $Url -Interactive -ClientId $ClientId
     }
 }
 Function Convert-Bytes {
