@@ -1,6 +1,6 @@
 ﻿<#-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Name: Automate Email Signature Setup in Outlook Using PowerShell
-Version: 1.0
+Version: 2.0
 Website: o365reports.com
 
 ~~~~~~~~~~~~~~~~~
@@ -16,9 +16,16 @@ Script Highlights:
 8. Supports certificate-based authentication (CBA) too.
 
 For detailed script execution: https://o365reports.com/2024/07/10/automate-email-signature-setup-in-outlook-using-powershell/
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#>
 
-#------------------------------------------------------------------------Block for passing params------------------------------------------------------------------------------------------
+
+Change Log:
+~~~~~~~~~~~
+
+v1.0 (July 10, 2024)- Script created
+V2.0 (Jan 18, 2025)- Error handling added to enabling PostponeRoamingSignatureUntilLater param.
+------------------------------------------------------------------------------------------------------------#>
+
+#Block for passing params
 
 [CmdletBinding(DefaultParameterSetName = 'NoParams')]
 param
@@ -67,15 +74,15 @@ if ($UserPrincipalName -ne "" -and $Password -ne "")
 {
   $SecurePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
   $UserCredential = New-Object System.Management.Automation.PSCredential ($UserPrincipalName,$SecurePassword)
-  Connect-ExchangeOnline -Credential $UserCredential
+  Connect-ExchangeOnline -Credential $UserCredential -ShowBanner:$false
 }
 elseif ($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
 {
-  Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -Organization $Organization
+  Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -Organization $Organization -ShowBanner:$false
 }
 elseif (-not $TaskScheduler)
 {
-  Connect-ExchangeOnline
+  Connect-ExchangeOnline -ShowBanner:$false
 }
 else
 {
@@ -111,9 +118,17 @@ if ((-not (Get-OrganizationConfig).PostponeRoamingSignaturesUntilLater) -and (-n
   {
     if ($Enable_PostponeRoamingSignatureUntilLater -or $UserConfirmation -eq 1)
     {
-      Set-OrganizationConfig -PostponeRoamingSignaturesUntilLater $true
+     Set-OrganizationConfig -PostponeRoamingSignaturesUntilLater $true
+     if($?)
+     {
       Write-Host "`n`PostponeRoamingSignatureUntilLater parameter enabled" -ForegroundColor Green
-      break;
+      break; 
+     }
+     else
+     {
+      Write-Host "Error occurred. Unable to enable PostPoneRoamingSignaturesUntilLater.Please try again" -ForegroundColor Red
+      Exit;
+     } 
     }
     elseif ($UserConfirmation -eq 2)
     {
