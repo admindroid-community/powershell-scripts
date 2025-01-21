@@ -1,6 +1,6 @@
 ﻿<#-----------------------------------------------------------------------------------------------------------
 Name           : How to Set Up an Email Signature in Outlook Using PowerShell
-Version        : 1.0
+Version        : 2.0
 Website        : o365reports.com
 
 Script Highlights: 
@@ -17,6 +17,12 @@ Script Highlights:
 9. Supports certificate-based authentication (CBA) too.
 
 For detailed script execution:  https://o365reports.com/2024/06/18/how-to-set-up-an-email-signature-in-outlook-using-powershell/
+
+Change Log:
+
+
+v1.0 (July 3, 2024)- Script created
+V2.0 (Jan 18, 2025)- Error handling added to enabling PostponeRoamingSignatureUntilLater param.
 
 ----------------------------------------------------------------------------------------------------------#>
 
@@ -81,15 +87,15 @@ if ($UserPrincipalName -ne "" -and $Password -ne "")
 {
   $SecurePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
   $UserCredential = New-Object System.Management.Automation.PSCredential ($UserPrincipalName,$SecurePassword)
-  Connect-ExchangeOnline -Credential $UserCredential
+  Connect-ExchangeOnline -Credential $UserCredential -ShowBanner:$false
 }
 elseif ($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
 {
-  Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -Organization $Organization
+  Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -Organization $Organization -ShowBanner:$false
 }
 else
 {
-  Connect-ExchangeOnline
+  Connect-ExchangeOnline -ShowBanner:$false
 }
 
 #------------------------Block for getting the Confirmation from user to enable the PostponeRoamingSignaturesUntilLater parameter if not already enabled------------------------------------
@@ -108,8 +114,17 @@ if (-not (Get-OrganizationConfig).PostponeRoamingSignaturesUntilLater)
     if ($Enable_PostponeRoamingSignatureUntilLater -or $UserConfirmation -eq 1)
     {
       Set-OrganizationConfig -PostponeRoamingSignaturesUntilLater $true
-      Write-Host "`n`PostponeRoamingSignatureUntilLater parameter enabled" -ForegroundColor Green
-      break;
+    if($?)
+    {
+     Write-Host "`n`PostponeRoamingSignatureUntilLater parameter enabled" -ForegroundColor Green
+     break; 
+    }
+    else
+    {
+     Write-Host "Error occurred. Unable to enable PostPoneRoamingSignaturesUntilLater.Please try again" -ForegroundColor Red
+     Exit;
+    } 
+      
     }
     elseif ($UserConfirmation -eq 2)
     {
