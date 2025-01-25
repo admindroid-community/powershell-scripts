@@ -74,7 +74,7 @@ Write-Host Connecting to Exchange Online...
 
 
 #Retrive audit log for the past 180 days
-if(($StartDate -eq $null) -and ($EndDate -eq $null))
+if(($null -eq $StartDate) -and ($null -eq $EndDate))
 {
  $EndDate=(Get-Date).Date
  $StartDate=$MaxStartDate
@@ -82,7 +82,7 @@ if(($StartDate -eq $null) -and ($EndDate -eq $null))
 #Getting start date to audit export report
 While($true)
 {
- if ($StartDate -eq $null)
+ if ($null -eq $StartDate)
  {
   $StartDate=Read-Host Enter start time for report generation '(Eg:12/15/2023)'
  }
@@ -109,7 +109,7 @@ While($true)
 #Getting end date to export audit report
 While($true)
 {
- if ($EndDate -eq $null)
+ if ($null -eq $EndDate)
  {
   $EndDate=Read-Host Enter End time for report generation '(Eg: 12/15/2023)'
  }
@@ -146,8 +146,6 @@ if($UserID -eq "")
  $UserID=Read-Host Enter user UPN '(eg:John@contoso.com)'
 }
 Write-host ~~~~~~~~
-$AggregateResults = @()
-$CurrentResult= @()
 $CurrentResultCount=0
 $AggregateResultCount=0
 Write-Host `nRetrieving user activity log from $StartDate to $EndDate... -ForegroundColor Yellow
@@ -164,7 +162,6 @@ while($true)
  #Getting audit log for given time range
  $Results=Search-UnifiedAuditLog -StartDate $CurrentStart -EndDate $CurrentEnd -UserIds $UserID -SessionId s -SessionCommand ReturnLargeSet -ResultSize 5000
  $ResultCount=($Results | Measure-Object).count
- $AllAuditData=@()
  foreach($Result in $Results)
  {
   $Count++
@@ -195,7 +192,6 @@ while($true)
    [DateTime]$CurrentStart=$CurrentEnd
    [DateTime]$CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
    $CurrentResultCount=0
-   $CurrentResult = @()
    if($CurrentEnd -gt $EndDate)
    {
     $CurrentEnd=$EndDate
@@ -224,7 +220,6 @@ while($true)
   }
   $CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
   $CurrentResultCount=0
-  $CurrentResult = @()
   if($CurrentEnd -gt $EndDate)
   {
    $CurrentEnd=$EndDate
