@@ -1,5 +1,5 @@
 ﻿<# Purpose      : Enable mailbox audit logging for all Office 365 mailboxes
-   Last updated : Oct 22, 2022
+   Last updated : Feb 22, 2025
    Website      : https://O365reports.com
  
 Script Highlights:
@@ -18,27 +18,30 @@ param(
 [Parameter(Mandatory = $false)]
 [string]$UserName, 
 [string]$Password, 
+ [string]$Organization,
+ [string]$ClientId,
+ [string]$CertificateThumbprint,
 [ValidateSet('ApplyRecord','Copy','Create','FolderBind','HardDelete','MailItemsAccessed','MessageBind','Move','MoveToDeletedItems','RecordDelete','SearchQueryInitiated','Send','SendAs','SendOnBehalf','SoftDelete','Update','UpdateCalendarDelegation','UpdateComplianceTag','UpdateFolderPermissions','UpdateInboxRules','MailboxLogin')]
 [string[]]$Operations=('ApplyRecord','Copy','Create','FolderBind','HardDelete','MailItemAccessed','MessageBind','Move','MoveToDeletedItems','RecordDelete','SearchQueryInitiated','Send','SendAs','SendOnBehalf','SoftDelete','Update','UpdateCalendarDelegation','UpdateComplianceTag','UpdateFolderPermissions','UpdateInboxRules','MailboxLogin')
 ) 
 
+
 Function Connect_Exo
 {
- #Check for EXO v2 module inatallation
+ #Check for EXO module inatallation
  $Module = Get-Module ExchangeOnlineManagement -ListAvailable
  if($Module.count -eq 0) 
  { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+  Write-Host Exchange Online PowerShell  module is not available  -ForegroundColor yellow  
   $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
   if($Confirm -match "[yY]") 
   { 
    Write-host "Installing Exchange Online PowerShell module"
    Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
-   Import-Module ExchangeOnlineManagement
   } 
   else 
   { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+   Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
    Exit
   }
  } 
@@ -48,11 +51,15 @@ Function Connect_Exo
  {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
   $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-  Connect-ExchangeOnline -Credential $Credential
+  Connect-ExchangeOnline -Credential $Credential -ShowBanner:$false
+ }
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
  }
  else
  {
-  Connect-ExchangeOnline
+  Connect-ExchangeOnline -ShowBanner:$false
  }
 }
 Connect_Exo 
@@ -64,7 +71,7 @@ Connect_Exo
 if($Operations.Length -eq 21)
 {
  $RequiredOperations=$Operations
- Get-Mailbox -ResultSize Unlimited | Select PrimarySmtpAddress,DisplayName | ForEach { 
+ Get-EXOMailbox -ResultSize Unlimited | Select PrimarySmtpAddress,DisplayName | ForEach { 
   $DisplayName=$_.Displayname
   Write-Progress -Activity "`n     Processed mailbox count: $MBCount "`n"  Currently Processing: $DisplayName"
   $MBCount++
@@ -93,7 +100,7 @@ else
   }
  }
  
- Get-Mailbox -ResultSize Unlimited | Select PrimarySmtpAddress,DisplayName | ForEach { 
+ Get-EXOMailbox -ResultSize Unlimited | Select PrimarySmtpAddress,DisplayName | ForEach { 
   $DisplayName=$_.Displayname
   Write-Progress -Activity "`n     Processed mailbox count: $MBCount "`n"  Currently Processing: $DisplayName"
   $MBCount++
