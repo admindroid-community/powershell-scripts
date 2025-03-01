@@ -7,20 +7,34 @@ Version:        4.0
 Script Highlights: 
 ~~~~~~~~~~~~~~~~~
 
-1.The script uses modern authentication to connect to Exchange Online.
+1.The script automatically installs the EXO PowerShell module (if not installed already) upon your confirmation.
 2.Allows you to filter the result based on successful and failed logon attempts. 
 3.The exported report has IP addresses from where your office 365 users are login. 
 4.This script can be executed with MFA enabled account. 
 5.You can export the report to choose either “All Office 365 users’ login attempts” or “Specific Office user’s logon attempts”. 
 6.By using advanced filtering options, you can export “Office 365 users Sign-in report” and “Suspicious login report”. 
 7.Exports report result to CSV. 
-8.Automatically installs the EXO V2 module (if not installed already) upon your confirmation. 
+8.Helps to track workload based sign-in history, such as Entra, Exchange Online, SharePoint Online, MS Teams
 9.This script is scheduler friendly. I.e., credentials can be passed as a parameter instead of saving inside the script. 
-10.Our Logon history report tracks login events in AzureActiveDirectory (UserLoggedIn, UserLoginFailed), ExchangeOnline (MailboxLogin) and MicrosoftTeams (TeamsSessionStarted). 
+10.Supports certificate-based authentication too.
 
 For detailed Script execution: https://o365reports.com/2019/12/23/export-office-365-users-logon-history-report/
+
+
+
+
+Change Log
+~~~~~~~~~~
+
+    V1.0 (Dec 23, 2019) - File created
+    V2.0 (Aug 10, 2022) - Upgraded from Exchange Online PowerShell V1 module.
+    V2.1 (Oct 06, 2023) - Minor usability improvements.
+    V3.0 (May 24, 2024) - Added certificate-based authentication support to enhance scheduling capability.
+    V4.0 (Mar 01, 2025) - Added workload param to enhance filtering capability.
 ============================================================================================
 #>
+
+
 Param
 (
     [Parameter(Mandatory = $false)]
@@ -28,6 +42,13 @@ Param
     [switch]$Failed,
     [Nullable[DateTime]]$StartDate,
     [Nullable[DateTime]]$EndDate,
+    [ValidateSet(
+        "EntraID", 
+        "MicrosoftTeams",
+        "Exchange", 
+        "SharePoint"
+    )]
+    [string[]]$Workload,
     [string]$UserName,
     [string]$Organization,
     [string]$ClientId,
@@ -44,16 +65,16 @@ if ((($StartDate -eq $null) -and ($EndDate -ne $null)) -or (($StartDate -ne $nul
 }   
 elseif(($StartDate -eq $null) -and ($EndDate -eq $null))
 {
- $StartDate=(((Get-Date).AddDays(-90))).Date
+ $StartDate=(((Get-Date).AddDays(-180))).Date
  $EndDate=Get-Date
 }
 else
 {
  $StartDate=[DateTime]$StartDate
  $EndDate=[DateTime]$EndDate
- if($StartDate -lt ((Get-Date).AddDays(-90)))
+ if($StartDate -lt ((Get-Date).AddDays(-180)))
  { 
-  Write-Host `nAudit log can be retrieved only for past 90 days. Please select a date after (Get-Date).AddDays(-90) -ForegroundColor Red
+  Write-Host `nAudit log can be retrieved only for past 180 days. Please select a date after (Get-Date).AddDays(-180) -ForegroundColor Red
   Exit
  }
  if($EndDate -lt ($StartDate))
@@ -98,24 +119,29 @@ $Module = Get-Module ExchangeOnlineManagement -ListAvailable
   Connect-ExchangeOnline -ShowBanner:$false
  }
 
+# Map friendly names to actual operations
+$WorkloadOperations = @{
+    "EntraID" = "UserLoggedIn,UserLoginFailed";
+    "MicrosoftTeams" = "TeamsSessionStarted";
+    "Exchange" = "MailboxLogin";
+    "SharePoint" = "SignInEvent"
+}
+
+
 $Location=Get-Location
 $OutputCSV="$Location\UserLoginHistoryReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 $IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
 $CurrentStart=$StartDate
 $CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
 
-#Filter for successful login attempts
-if($success.IsPresent)
-{
- $Operation="UserLoggedIn,TeamsSessionStarted,MailboxLogin,SignInEvent"
-}
-#Filter for successful login attempts
-elseif($Failed.IsPresent)
-{
+#Apply filters based on params
+if ($Failed.IsPresent) {
  $Operation="UserLoginFailed"
-}
-else
-{
+} elseif (-not [string]::IsNullOrEmpty($Workload)) {
+ $Operation = ($Workload | ForEach-Object { $WorkloadOperations[$_] }) -join ","
+} elseif ($Success.IsPresent) {
+ $Operation="UserLoggedIn,TeamsSessionStarted,MailboxLogin,SignInEvent"
+} else {
  $Operation="UserLoggedIn,UserLoginFailed,TeamsSessionStarted,MailboxLogin,SignInEvent"
 }
 
@@ -157,7 +183,7 @@ while($true)
  {
   $AuditData=$Result.auditdata | ConvertFrom-Json
   $AuditData.CreationTime=(Get-Date($AuditData.CreationTime)).ToLocalTime()
-  $AllAudits=@{'Login Time'=$AuditData.CreationTime;'User Name'=$AuditData.UserId;'IP Address'=$AuditData.ClientIP;'Operation'=$AuditData.Operation;'Result Status'=$AuditData.ResultStatus;'Workload'=$AuditData.Workload}
+  $AllAudits=@{'Login Time'=$AuditData.CreationTime;'User Name'=$AuditData.UserId;'IP Address'=$AuditData.ClientIP;'Operation'=$AuditData.Operation;'Result Status'=$AuditData.ResultStatus;'Workload'=$AuditData.Workload;}
   $AllAuditData= New-Object PSObject -Property $AllAudits
   $AllAuditData | Sort 'Login Time','User Name' | select 'Login Time','User Name','IP Address',Operation,'Result Status',Workload | Export-Csv $OutputCSV -NoTypeInformation -Append
  }
