@@ -229,7 +229,6 @@ if($Global:MeetingCount -ne 0)
   foreach($Result in $Results)
   {
    $ProcessedAuditCount++
-   Write-Progress -Activity "`n     Retrieving Team meeting participant report..."`n" Processed audit record count: $ProcessedAuditCount"
    $AuditData=$Result.AuditData  | ConvertFrom-Json
    $MeetingID=$AuditData.MeetingDetailId
    $CreatedBy=$Result.UserIDs
@@ -255,7 +254,7 @@ if($Global:MeetingCount -ne 0)
    $ExportResults | Select-Object 'Meeting id','Created By','Attendees','Attendee Type','Joined Time','Left Time','More Info' | Export-Csv -Path $OutputCSV -Notype -Append 
   }
   $currentResultCount=$CurrentResultCount+$ResultsCount
-  Write-Progress -Activity "`n     Retrieving audit log for $CurrentStart : $CurrentResultCount records"`n" Total processed audit record count: $AggregateResults"
+  Write-Progress -Activity "`n     Retrieving audit log for $CurrentStart : $CurrentResultCount records"`n" Total processed audit record count: $ProcessedAuditCount"
   if(($CurrentResultCount -eq 50000) -or ($ResultsCount -lt 5000))
   {
    if($CurrentResultCount -eq 50000)
