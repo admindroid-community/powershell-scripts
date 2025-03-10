@@ -31,29 +31,29 @@ Param
 )
 
 function Connect_MgGraph {
-    $MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+    $MsGraphBetaModule =  Get-Module Microsoft.Graph -ListAvailable
     if($MsGraphBetaModule -eq $null)
     { 
-        Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-        $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
+        Write-host "Important: Microsoft Graph PowerShell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+        $confirm = Read-Host Are you sure you want to install Microsoft Graph PowerShell module? [Y] Yes [N] No  
         if($confirm -match "[yY]") 
         { 
-            Write-host "Installing Microsoft Graph Beta module..."
-            Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
-            Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
+            Write-host "Installing Microsoft Graph PowerShell module..."
+            Install-Module Microsoft.Graph -Scope CurrentUser -AllowClobber
+            Write-host "Microsoft Graph PowerShell module is installed in the machine successfully" -ForegroundColor Magenta 
         } 
         else
         { 
-            Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
+            Write-host "Exiting. `nNote: Microsoft Graph PowerShell module must be available in your system to run the script" -ForegroundColor Red
             Exit 
         } 
     }
     Write-Progress "Importing Required Modules..."
-    Import-Module -Name Microsoft.Graph.Beta.Identity.DirectoryManagement
-    Import-Module -Name Microsoft.Graph.Beta.Users
-    Import-Module -Name Microsoft.Graph.Beta.Users.Actions
+    Import-Module -Name Microsoft.Graph.Identity.DirectoryManagement
+    Import-Module -Name Microsoft.Graph.Users
+    Import-Module -Name Microsoft.Graph.Users.Actions
     Write-Progress "Connecting MgGraph Module..."
-    Connect-MgGraph -Scopes "Directory.ReadWrite.All"
+    Connect-MgGraph -Scopes "Directory.ReadWrite.All" -NoWelcome
 }
 Function Open_OutputFile {
     #Open output file after execution 
@@ -124,7 +124,7 @@ Function Get_License_FriendlyName {
 Function Set_UsageLocation {
     if ($LicenseUsageLocation -ne "") {
         "Assigning Usage Location $LicenseUsageLocation to $UPN" |  Out-File $OutputCSVName -Append
-        Update-MgBetaUser -UserId $UPN -UsageLocation $LicenseUsageLocation
+        Update-MgUser -UserId $UPN -UsageLocation $LicenseUsageLocation
     }
     else {
         "Usage location is mandatory to assign license. Please set Usage location for $UPN" |  Out-File $OutputCSVName -Append
@@ -133,7 +133,7 @@ Function Set_UsageLocation {
 
 Function Assign_Licenses {
     "Assigning $LicenseNames license to $UPN" | Out-File $OutputCSVName -Append
-    Set-MgBetaUserLicense -UserId $UPN -AddLicenses @{SkuId = $SkuPartNumberHash[$LicenseNames] } -RemoveLicenses @() | Out-Null
+    Set-MgUserLicense -UserId $UPN -AddLicenses @{SkuId = $SkuPartNumberHash[$LicenseNames] } -RemoveLicenses @() | Out-Null
     if ($?) {
         "License assigned successfully" | Out-File $OutputCSVName -Append
     }
@@ -150,7 +150,7 @@ Function Remove_Licenses {
     $SkuPartNumber = $SkuPartNumber -join (",")
     Write-Progress -Activity "`n     Removing $SkuPartNumber license from $UPN "`n"  Processed users: $ProcessedCount"
     "Removing $SkuPartNumber license from $UPN" | Out-File $OutputCSVName -Append
-    Set-MgBetaUserLicense -UserId $UPN -RemoveLicenses @($License) -AddLicenses @() | Out-Null
+    Set-MgUserLicense -UserId $UPN -RemoveLicenses @($License) -AddLicenses @() | Out-Null
     if ($?) {
         "License removed successfully" | Out-File $OutputCSVName -Append
     }
@@ -168,7 +168,7 @@ Function main() {
     $FriendlyNameHash = Get-Content -Raw -Path .\LicenseFriendlyName.txt -ErrorAction Stop | ConvertFrom-StringData
     $SkuPartNumberHash = @{} 
     $SkuIdHash = @{} 
-    Get-MgBetaSubscribedSku -All | Select-Object SkuPartNumber, SkuId | ForEach-Object {
+    Get-MgSubscribedSku -All | Select-Object SkuPartNumber, SkuId | ForEach-Object {
         $SkuPartNumberHash.add(($_.SkuPartNumber), ($_.SkuId))
         $SkuIdHash.add(($_.SkuId), ($_.SkuPartNumber))
     }
@@ -202,7 +202,7 @@ Function main() {
                 $OutputCSVName = ".\O365UserLicenseReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
                 Write-Host Generating licensed users report...
                 $ProcessedCount = 0
-                Get-MgBetaUser -All | Where-Object {($_.AssignedLicenses.Count) -ne 0 } | ForEach-Object {
+                Get-MgUser -All | Where-Object {($_.AssignedLicenses.Count) -ne 0 } | ForEach-Object {
                     $ProcessedCount++
                     Get_UserInfo
                     Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -219,7 +219,7 @@ Function main() {
                 $OutputCSVName = ".\O365UnlicenedUserReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
                 Write-Host Generating Unlicensed users report...
                 $ProcessedCount = 0
-                Get-MgBetaUser -All | Where-Object {($_.AssignedLicenses.Count) -eq 0 } | ForEach-Object {
+                Get-MgUser -All | Where-Object {($_.AssignedLicenses.Count) -eq 0 } | ForEach-Object {
                     $ProcessedCount++
                     Get_UserInfo
                     Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -239,7 +239,7 @@ Function main() {
                 Write-Host Getting users with $LicenseName license...
                 $ProcessedCount = 0
                 if ($SkuPartNumberHash.Keys -icontains $LicenseName) {
-                    Get-MgBetaUser -All | Where-Object{(($_.AssignedLicenses).SkuId) -eq $SkuPartNumberHash[$LicenseName]} | ForEach-Object {
+                    Get-MgUser -All | Where-Object{(($_.AssignedLicenses).SkuId) -eq $SkuPartNumberHash[$LicenseName]} | ForEach-Object {
                         $ProcessedCount++
                         Get_UserInfo
                         Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -262,7 +262,7 @@ Function main() {
                 $OutputCSVName = "./O365DiabledUsersWithLicense__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
                 $ProcessedCount = 0
                 Write-Host Finding disabled users still licensed in Office 365...
-                Get-MgBetaUser -All | Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
+                Get-MgUser -All | Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
                     $ProcessedCount++
                     Get_UserInfo
                     Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -279,7 +279,7 @@ Function main() {
                 $OutputCSVName = "./Office365LicenseUsageReport__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
                 Write-Host Generating Office 365 license usage report...
                 $ProcessedCount = 0
-                Get-MgBetaSubscribedSku | ForEach-Object {
+                Get-MgSubscribedSku | ForEach-Object {
                     $ProcessedCount++
                     $AccountSkuID = $_.SkuID
                     $LicensePlan = $_.SkuPartNumber
@@ -313,7 +313,7 @@ Function main() {
                         $ProcessedCount++
                         $UPN = $Item.UPN
                         Write-Progress -Activity "`n     Assigning $LicenseNames license to $UPN "`n"  Processed users: $ProcessedCount"
-                        $UsageLocation = (Get-MgBetaUser -UserId $UPN).UsageLocation
+                        $UsageLocation = (Get-MgUser -UserId $UPN).UsageLocation
                         if ($UsageLocation -eq $null) {
                             Set_UsageLocation
                         }
@@ -357,7 +357,7 @@ Function main() {
                     foreach ($Item in $UserNames) {
                         $UPN = $Item.UPN
                         $ProcessedCount++
-                        $UsageLocation = (Get-MgBetaUser -UserId $UPN).UsageLocation
+                        $UsageLocation = (Get-MgUser -UserId $UPN).UsageLocation
                         if ($UsageLocation -eq $null) {
                             Set_UsageLocation
                         }
@@ -379,7 +379,7 @@ Function main() {
 
             8 {
                 $Identity = Read-Host Enter User UPN
-                $UserInfo = Get-MgBetaUser -UserId $Identity
+                $UserInfo = Get-MgUser -UserId $Identity
                 #Checking whether the user is available
                 if ($UserInfo -eq $null) {
                     Write-Host User $Identity does not exist. Please check the user name. -ForegroundColor Red
@@ -396,7 +396,7 @@ Function main() {
                         }
                         $SkuPartNumber = $SkuPartNumber -join (",")
                         Write-Host Removing $SkuPartNumber license from $Identity
-                        Set-MgBetaUserLicense -UserId $Identity -RemoveLicenses @($Licenses) -AddLicenses @() | Out-Null
+                        Set-MgUserLicense -UserId $Identity -RemoveLicenses @($Licenses) -AddLicenses @() | Out-Null
                         Write-Host Action completed -ForegroundColor Green                        
                     }
                 }  
@@ -412,7 +412,7 @@ Function main() {
                 foreach ($Item in $UserNames) {
                     $UPN = $Item.UPN
                     $ProcessedCount++
-                    $License = (Get-MgBetaUser -UserId $UPN).AssignedLicenses.SkuId
+                    $License = (Get-MgUser -UserId $UPN).AssignedLicenses.SkuId
                     if ($License.count -eq 0) {
                         "No License Assigned to this user $UPN" | Out-File $OutputCSVName -Append
                     }
@@ -430,7 +430,7 @@ Function main() {
                 $License = $SkuPartNumberHash[$Licenses]
                 $ProcessedCount = 0
                 if ($SkuPartNumberHash.Values -icontains $License) {
-                    Get-MgBetaUser -All | Where-Object { ($_.AssignedLicenses).SkuId -eq $License } | ForEach-Object {
+                    Get-MgUser -All | Where-Object { ($_.AssignedLicenses).SkuId -eq $License } | ForEach-Object {
                         $ProcessedCount++
                         $UPN = $_.UserPrincipalName
                         Remove_Licenses
@@ -447,7 +447,7 @@ Function main() {
                 $OutputCSVName = "./O365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
                 Write-Host Removing license from disabled users...
                 $ProcessedCount = 0
-                Get-MgBetaUser -All | Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
+                Get-MgUser -All | Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
                     $ProcessedCount++
                     $UPN = $_.UserPrincipalName
                     $License = $_.AssignedLicenses.SkuId
