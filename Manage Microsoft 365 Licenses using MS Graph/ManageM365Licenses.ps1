@@ -3,7 +3,6 @@
 Name:           Manage Microsoft 365 licenses using MS Graph PowerShell
 Description:    This script can perform 10+ Office 365 reporting and management activities
 website:        o365reports.com
-Script by:      O365Reports Team
 
 Script Highlights :
 ~~~~~~~~~~~~~~~~~
@@ -16,6 +15,13 @@ Script Highlights :
 6.	The script can be executed with an MFA enabled account too.
 7.	Exports the report result to CSV.
 8.	Exports license assignment and removal log file.
+
+
+Change Log
+~~~~~~~~~~
+  V1.0 (Sep 08, 2022) - File created
+  V2.0 (Mar 10, 2025)  - Upgraded from MS Graph beta to production version
+  V2.1 (Mar 21, 2025)  - Feature break due to module upgrade fixed.
 
 
 For detailed Script execution: https://o365reports.com/2022/09/08/manage-365-licenses-using-ms-graph-powershell
@@ -125,9 +131,15 @@ Function Set_UsageLocation {
     if ($LicenseUsageLocation -ne "") {
         "Assigning Usage Location $LicenseUsageLocation to $UPN" |  Out-File $OutputCSVName -Append
         Update-MgUser -UserId $UPN -UsageLocation $LicenseUsageLocation
+        if(!($?))
+        {
+         "Error occurred while assigning usage location to $UPN or user not found" |  Out-File $OutputCSVName -Append
+         Continue
+         }
     }
     else {
         "Usage location is mandatory to assign license. Please set Usage location for $UPN" |  Out-File $OutputCSVName -Append
+        Continue
     }
 }
 
@@ -162,7 +174,6 @@ Function Remove_Licenses {
 Function main() {
     Disconnect-MgGraph -ErrorAction SilentlyContinue|Out-Null
     Connect_MgGraph
-    Write-Host "`nNote: If you encounter module related conflicts, run the script in a fresh PowerShell window." -ForegroundColor Yellow
     $Result = ""  
     $Results = @() 
     $FriendlyNameHash = Get-Content -Raw -Path .\LicenseFriendlyName.txt -ErrorAction Stop | ConvertFrom-StringData
@@ -313,13 +324,14 @@ Function main() {
                         $ProcessedCount++
                         $UPN = $Item.UPN
                         Write-Progress -Activity "`n     Assigning $LicenseNames license to $UPN "`n"  Processed users: $ProcessedCount"
-                        $UsageLocation = (Get-MgUser -UserId $UPN).UsageLocation
+                        $UsageLocation = (Get-MgUser -UserId $UPN -Property UsageLocation).UsageLocation
+
                         if ($UsageLocation -eq $null) {
                             Set_UsageLocation
                         }
-                        else {
-                            Assign_Licenses
-                        }
+                       
+                        Assign_Licenses
+                        
                     }
                 }
                 else {
@@ -357,16 +369,16 @@ Function main() {
                     foreach ($Item in $UserNames) {
                         $UPN = $Item.UPN
                         $ProcessedCount++
-                        $UsageLocation = (Get-MgUser -UserId $UPN).UsageLocation
+                        $UsageLocation = (Get-MgUser -UserId $UPN -Property UsageLocation).UsageLocation
                         if ($UsageLocation -eq $null) {
                             Set_UsageLocation
                         }
-                        else {
-                            Write-Progress -Activity "`n     Assigning licenses to $UPN "`n"  Processed users: $ProcessedCount"
-                            foreach ($LicenseNames in $License) {
-                                Assign_Licenses
-                            }
+                       
+                        Write-Progress -Activity "`n     Assigning licenses to $UPN "`n"  Processed users: $ProcessedCount"
+                        foreach ($LicenseNames in $License) {
+                             Assign_Licenses
                         }
+                        
                     }
                 }
                 #Clearing license names and input file location for next iteration
