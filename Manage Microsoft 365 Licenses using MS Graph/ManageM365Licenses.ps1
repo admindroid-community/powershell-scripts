@@ -22,6 +22,7 @@ Change Log
   V1.0 (Sep 08, 2022) - File created
   V2.0 (Mar 10, 2025)  - Upgraded from MS Graph beta to production version
   V2.1 (Mar 21, 2025)  - Feature break due to module upgrade fixed.
+  V2.2 (Mar 26, 2025) - Used 'Property' param to retrive user properties.
 
 
 For detailed Script execution: https://o365reports.com/2022/09/08/manage-365-licenses-using-ms-graph-powershell
@@ -211,9 +212,10 @@ Function main() {
         Switch ($GetAction) {
             1 {
                 $OutputCSVName = ".\O365UserLicenseReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
                 Write-Host Generating licensed users report...
                 $ProcessedCount = 0
-                Get-MgUser -All | Where-Object {($_.AssignedLicenses.Count) -ne 0 } | ForEach-Object {
+                Get-MgUser -All -Property $RequiredProperties | Where-Object {($_.AssignedLicenses.Count) -ne 0 } | ForEach-Object {
                     $ProcessedCount++
                     Get_UserInfo
                     Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -228,9 +230,10 @@ Function main() {
 
             2 {
                 $OutputCSVName = ".\O365UnlicenedUserReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
                 Write-Host Generating Unlicensed users report...
                 $ProcessedCount = 0
-                Get-MgUser -All | Where-Object {($_.AssignedLicenses.Count) -eq 0 } | ForEach-Object {
+                Get-MgUser -All -Property $RequiredProperties | Where-Object {($_.AssignedLicenses.Count) -eq 0 } | ForEach-Object {
                     $ProcessedCount++
                     Get_UserInfo
                     Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -249,8 +252,9 @@ Function main() {
                 }
                 Write-Host Getting users with $LicenseName license...
                 $ProcessedCount = 0
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
                 if ($SkuPartNumberHash.Keys -icontains $LicenseName) {
-                    Get-MgUser -All | Where-Object{(($_.AssignedLicenses).SkuId) -eq $SkuPartNumberHash[$LicenseName]} | ForEach-Object {
+                    Get-MgUser -All -Property $RequiredProperties| Where-Object{(($_.AssignedLicenses).SkuId) -eq $SkuPartNumberHash[$LicenseName]} | ForEach-Object {
                         $ProcessedCount++
                         Get_UserInfo
                         Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -272,8 +276,9 @@ Function main() {
             4 {
                 $OutputCSVName = "./O365DiabledUsersWithLicense__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
                 $ProcessedCount = 0
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
                 Write-Host Finding disabled users still licensed in Office 365...
-                Get-MgUser -All | Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
+                Get-MgUser -All -Property $RequiredProperties| Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
                     $ProcessedCount++
                     Get_UserInfo
                     Write-Progress -Activity "`n     Processed users count: $ProcessedCount "`n"  Currently Processing: $DisplayName"
@@ -391,7 +396,7 @@ Function main() {
 
             8 {
                 $Identity = Read-Host Enter User UPN
-                $UserInfo = Get-MgUser -UserId $Identity
+                $UserInfo = Get-MgUser -UserId $Identity -Property "DisplayName,AssignedLicenses"
                 #Checking whether the user is available
                 if ($UserInfo -eq $null) {
                     Write-Host User $Identity does not exist. Please check the user name. -ForegroundColor Red
@@ -424,7 +429,7 @@ Function main() {
                 foreach ($Item in $UserNames) {
                     $UPN = $Item.UPN
                     $ProcessedCount++
-                    $License = (Get-MgUser -UserId $UPN).AssignedLicenses.SkuId
+                    $License = (Get-MgUser -UserId $UPN -Property AssignedLicenses).AssignedLicenses.SkuId
                     if ($License.count -eq 0) {
                         "No License Assigned to this user $UPN" | Out-File $OutputCSVName -Append
                     }
@@ -442,7 +447,7 @@ Function main() {
                 $License = $SkuPartNumberHash[$Licenses]
                 $ProcessedCount = 0
                 if ($SkuPartNumberHash.Values -icontains $License) {
-                    Get-MgUser -All | Where-Object { ($_.AssignedLicenses).SkuId -eq $License } | ForEach-Object {
+                    Get-MgUser -All -Property UserPrincipalName,AssignedLicenses | Where-Object { ($_.AssignedLicenses).SkuId -eq $License } | ForEach-Object {
                         $ProcessedCount++
                         $UPN = $_.UserPrincipalName
                         Remove_Licenses
@@ -459,7 +464,7 @@ Function main() {
                 $OutputCSVName = "./O365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
                 Write-Host Removing license from disabled users...
                 $ProcessedCount = 0
-                Get-MgUser -All | Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
+                Get-MgUser -All -Property UserPrincipalName,AssignedLicenses,AccountEnabled | Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
                     $ProcessedCount++
                     $UPN = $_.UserPrincipalName
                     $License = $_.AssignedLicenses.SkuId
