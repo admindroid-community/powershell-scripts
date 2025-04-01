@@ -21,6 +21,14 @@ Script Highlights:
 12. Includes scheduler-friendly functionality for automated reporting. 
 
 For detailed Script execution: https://o365reports.com/2024/02/20/export-conditional-access-policies-to-excel-using-powershell
+
+
+Change Log:
+~~~~~~~~~~
+  V1.0 (Feb 20, 2024) - File created
+  V2.0 (Feb 27, 2024) - Some CA policies doesn't have creation time. Error handling added for those CA policies.
+  V2.1 (Aug 09, 2024) - Error handling added when the script tries to convert a deleted object ID into a name.
+  V2.2 (Apr 01, 2025) - Fixed error while converting directory objects to names.
 ============================================================================================
 #>
 
@@ -95,6 +103,7 @@ Function ConvertTo-Name {
         if($DirectoryObjsHash.ContainsKey($Id))
         {
          $Name=$DirectoryObjsHash[$Id]
+         $ConvertedNames += $Name
         }
         # Retrieve the display name for the directory object with the given ID
         else{
