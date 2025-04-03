@@ -2,12 +2,22 @@
 =============================================================================================
 Name:           Automate Microsoft 365 User Offboarding with PowerShell
 Description:    This script can perform 14 Microsoft 365 offboarding activities.
-website:        blog.Admindroid.com
+Website:        blog.Admindroid.com
 Script by:      AdminDroid Team
+Version:        2.0
+
 
 For detailed Script execution: https://blog.admindroid.com/automate-microsoft-365-user-offboarding-with-powershell
-==============================================================================================
 
+
+Change Log
+~~~~~~~~~~
+
+    V1.0 (Oct 14, 2023) - File created
+    V2.0 (Apr 02, 2025) - Removed beta version cmdlets 
+
+=========================================================================================
+#>
 param(
 [string]$TenantId,
 [string]$ClientId,
@@ -17,20 +27,20 @@ param(
 )
 Function ConnectModules 
 {
-    $MsGraphBetaModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
-    if($MsGraphBetaModule -eq $null)
+    $MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable
+    if($MsGraphModule -eq $null)
     { 
-        Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-        $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
+        Write-host "Important: Microsoft Graph module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+        $confirm = Read-Host Are you sure you want to install Microsoft Graph module? [Y] Yes [N] No  
         if($confirm -match "[yY]") 
         { 
-            Write-host "Installing Microsoft Graph Beta module..."
-            Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
-            Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
+            Write-host "Installing Microsoft Graph module..."
+            Install-Module Microsoft.Graph -Scope CurrentUser -AllowClobber
+            Write-host "Microsoft Graph module is installed in the machine successfully" -ForegroundColor Magenta 
         } 
         else
         { 
-            Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
+            Write-host "Exiting. `nNote: Microsoft Graph module must be available in your system to run the script" -ForegroundColor Red
             Exit 
         } 
     }
@@ -73,11 +83,11 @@ Function ConnectModules
                     Exit
                 }
             }
-            Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization (Get-MgBetaDomain | Where-Object {$_.isInitial}).Id -ShowBanner:$false
+            Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization (Get-MgDomain | Where-Object {$_.isInitial}).Id -ShowBanner:$false
         }
         else
         {
-            Connect-MgGraph  -ErrorAction SilentlyContinue -Errorvariable ConnectionError |Out-Null
+            Connect-MgGraph -Scopes Directory.ReadWrite.All,AppRoleAssignment.ReadWrite.All,User.EnableDisableAccount.All,Directory.AccessAsUser.All,RoleManagement.ReadWrite.Directory -ErrorAction SilentlyContinue -Errorvariable ConnectionError |Out-Null
             if($ConnectionError -ne $null)
             {
                 Write-Host $ConnectionError -Foregroundcolor Red
@@ -91,14 +101,14 @@ Function ConnectModules
         Write-Host $_.Exception.message -ForegroundColor Red
         Exit
     }
-    Write-Host "Microsoft Graph Beta PowerShell module is connected successfully" -ForegroundColor Cyan
+    Write-Host "Microsoft Graph PowerShell module is connected successfully" -ForegroundColor Cyan
     Write-Host "Exchange Online module is connected successfully" -ForegroundColor Cyan
 }
 
 Function DisableUser
 {
     try{
-        Update-MgBetaUser -UserId $UPN -AccountEnabled:$false
+        Update-MgUser -UserId $UPN -AccountEnabled:$false
         $Script:DisableUserAction = "Success"
     }
     catch
@@ -119,7 +129,7 @@ Function ResetPasswordToRandom
 		    forceChangePasswordNextSignIn = $true
 		    password = $Pwd
 	    }
-        Update-MgBetaUser -UserId $UPN -PasswordProfile $Passwordprofile
+        Update-MgUser -UserId $UPN -PasswordProfile $Passwordprofile
         $log>>$PasswordLogFile
         $Script:ResetPasswordToRandomAction = "Success"
     }
@@ -133,7 +143,7 @@ Function ResetPasswordToRandom
 Function ResetOfficeName
 {
     try{
-        Update-MgBetaUser -UserId $UPN -OfficeLocation "EXD"
+        Update-MgUser -UserId $UPN -OfficeLocation "EXD"
         $Script:ResetOfficeNameAction = "Success"
     }
     catch
@@ -147,7 +157,7 @@ Function ResetOfficeName
 Function RemoveMobileNumber
 {
     try{
-        Update-MgBetaUser -UserId $UPN -MobilePhone ' '
+        Update-MgUser -UserId $UPN -MobilePhone null
         $Script:RemoveMobileNumberAction = "Success"
     }
     catch
@@ -161,11 +171,11 @@ Function RemoveMobileNumber
 Function RemoveGroupMemberships
 {
     #Remove memberships from group
-    $groupMemberships = $Memberships|?{$_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.group'}
+    $groupMemberships = $Memberships|?{($_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.group') -and ($_.AdditionalProperties.'groupTypes' -notcontains 'DynamicMembership')}
     foreach($Membership in $groupMemberships)
     {
         try{ 
-            Remove-MgBetaGroupMemberByRef -GroupId $Membership.Id -DirectoryObjectId $UserId -ErrorAction SilentlyContinue -ErrorVariable MemberRemovalErr
+            Remove-MgGroupMemberByRef -GroupId $Membership.Id -DirectoryObjectId $UserId -ErrorAction SilentlyContinue -ErrorVariable MemberRemovalErr
             if($MemberRemovalErr)
             {
                 Remove-DistributionGroupMember -Identity $Membership.Id  -Member $UserId -BypassSecurityGroupManagerCheck -Confirm:$false
@@ -178,20 +188,20 @@ Function RemoveGroupMemberships
         }
     }
     #Remove ownerships from group
-    $UserOwnerships = Get-MgBetaUserOwnedObject -UserId $UPN|?{$_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.group'}
-    foreach($UserOwnership in $UserOwnerships)
+    $GroupOwnerships = Get-MgUserOwnedObject -UserId $UPN|?{$_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.group'}
+    foreach($GroupOwnership in $GroupOwnerships)
     {
         try{
-            Remove-MgBetaGroupOwnerByRef -GroupId $UserOwnership.Id -DirectoryObjectId $UserId -ErrorAction SilentlyContinue -ErrorVariable OwnerRemovalErr
+            Remove-MgGroupOwnerByRef -GroupId $GroupOwnership.Id -DirectoryObjectId $UserId -ErrorAction SilentlyContinue -ErrorVariable OwnerRemovalErr
             if($OwnerRemovalErr)
             {
-                $ErrorLog = "$($UPN) - GroupId($($UserOwnership.Id)) - Remove Group Memberships Action - "+$OwnerRemovalErr.Exception.Message
+                $ErrorLog = "$($UPN) - GroupId($($GroupOwnership.Id)) - Remove Group Memberships Action - "+$OwnerRemovalErr.Exception.Message
                 $ErrorLog>>$ErrorsLogFile
             }
         }
         catch
         {
-            $ErrorLog = "$($UPN) - GroupId($($UserOwnership.Id)) - Remove Group Memberships Action - "+$Error[0].Exception.Message
+            $ErrorLog = "$($UPN) - GroupId($($GroupOwnership.Id)) - Remove Group Memberships Action - "+$Error[0].Exception.Message
             $ErrorLog>>$ErrorsLogFile
         }
     }
@@ -209,7 +219,7 @@ Function RemoveGroupMemberships
     {
         $Script:RemoveGroupMembershipsAction = "Success"
     }
-    elseif($groupMemberships -eq $null -and $UserOwnerships -eq $null -and $DistributionGroupOwnerships -eq $null)
+    elseif($groupMemberships -eq $null -and $GroupOwnerships -eq $null -and $DistributionGroupOwnerships -eq $null)
     {
         $Script:RemoveGroupMembershipsAction = "No group memberships"
     }
@@ -232,7 +242,7 @@ Function RemoveAdminRoles
         foreach($AdminRole in $AdminRoles)
         {
             try{
-                Remove-MgBetaDirectoryRoleMemberByRef -DirectoryObjectId $UserId -DirectoryRoleId $AdminRole.Id 
+                Remove-MgDirectoryRoleMemberByRef -DirectoryObjectId $UserId -DirectoryRoleId $AdminRole.Id 
             }
             catch
             {
@@ -252,12 +262,12 @@ Function RemoveAdminRoles
 }
 Function RemoveAppRoleAssignments
 {
-    $AppRoleAssignments = Get-MgBetaUserAppRoleAssignment -UserId $UPN
+    $AppRoleAssignments = Get-MgUserAppRoleAssignment -UserId $UPN
     if($AppRoleAssignments -ne $null)
     {
         $AppRoleAssignments | ForEach-Object {
             try{
-                Remove-MgBetaUserAppRoleAssignment -AppRoleAssignmentID $_.Id -UserId $UPN
+                Remove-MgUserAppRoleAssignment -AppRoleAssignmentID $_.Id -UserId $UPN
             }
             catch
             {
@@ -384,10 +394,10 @@ Function ConvertToSharedMailbox
 
 Function RemoveLicense
 {
-    $Licenses = Get-MgBetaUserLicenseDetail -UserId $UPN
+    $Licenses = Get-MgUserLicenseDetail -UserId $UPN
     if($Licenses -ne $null)
     {
-        Set-MgBetaUserLicense -UserId $UPN -RemoveLicenses @($Licenses.SkuId) -AddLicenses @() -ErrorAction SilentlyContinue -ErrorVariable LicenseError | Out-Null
+        Set-MgUserLicense -UserId $UPN -RemoveLicenses @($Licenses.SkuId) -AddLicenses @() -ErrorAction SilentlyContinue -ErrorVariable LicenseError | Out-Null
         if($LicenseError)
         {
             $Script:RemoveLicenseAction = "Failed"
@@ -407,7 +417,7 @@ Function RemoveLicense
 
 Function SignOutFromAllSessions
 {
-    Revoke-MgBetaUserSignInSession -UserId $UPN | Out-Null
+    Revoke-MgUserSignInSession -UserId $UPN | Out-Null
     $Script:SignOutFromAllSessionsAction = "Success"
 }
 
@@ -494,7 +504,7 @@ Function main
         $UPN = $UPN.Trim()
         Write-Progress "Processing $UPN"
         $Script:Status = "$UPN - "
-        $User = Get-MgBetaUser -UserId $UPN -ErrorAction SilentlyContinue 
+        $User = Get-MgUser -UserId $UPN -ErrorAction SilentlyContinue 
         $UserId = $User.Id
         if($User -eq $null)
         {
@@ -517,7 +527,7 @@ Function main
         }
         if($Actions -contains 5 -or $Actions -contains 6) # To get memberships of the user (group and roles)
         {
-            $Memberships = Get-MgBetaUserMemberOf -UserId $UPN
+            $Memberships = Get-MgUserMemberOf -UserId $UPN
         }       
         foreach($Action in $Actions)
         {
