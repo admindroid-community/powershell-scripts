@@ -2,8 +2,11 @@
 =============================================================================================
 Name:           Connect to all the Microsoft services using PowerShell
 Description:    This script automatically installs all the required modules(upon your confirmation) and connects to the services
-Version:        4.0
+Version:        4.1
 Website:        o365reports.com
+
+Script Highlights:
+~~~~~~~~~~~~~~~~~
 
 1.This script connects to 9 Microsoft 365 services with a single cmdlet.
 2.Installs Microsoft 365 PowerShell modules. ie, Modules required for Microsoft 365 services are automatically downloaded and installed upon your confirmation.
@@ -15,6 +18,16 @@ Website:        o365reports.com
 7.The script supports Certificate-Based Authentication (CBA) too.
 
 For detailed script execution: https://o365reports.com/2019/10/05/connect-all-office-365-services-powershell/
+
+Change Log:
+~~~~~~~~~~~
+~~~~~~~~~
+  V1.0 (Nov 01, 2019) - File created
+  V2.0 (Jan 21, 2020)  - Added support for MS Online and SharePoint PnP PowerShell modules
+  V3.0 (Oct 06, 2023)  - Removed Skype for Business and minor usability changes
+  V4.0 (Feb 29, 2024) - Added support for MS Graph and MS Graph beta PowerShell modules
+  V4.1 (Apr 03, 2025) - Handled ClientId requirement for SharePoint PnP PowerShell module
+  
 ============================================================================================
 #>
 Param
@@ -287,11 +300,16 @@ else
      Write-Host SharePoint organization name is required.`nEg: Contoso for admin@Contoso.com -ForegroundColor Yellow
      $SharePointHostName= Read-Host "Please enter SharePoint organization name"  
     }
-  
+    
+    if($AppId -eq "")
+    {
+     Write-Host `nClient Id is mandatory to connect SharePoint PnP PowerShell -ForegroundColor Yellow
+     $AppId= Read-Host "Please enter client id to connect PnP PowerShell"
+    }
    
     if($CredentialPassed -eq $true)
     {
-     Connect-PnPOnline -Url https://$SharePointHostName-admin.sharepoint.com  -credential $credential  -WarningAction Ignore
+     Connect-PnPOnline -Url https://$SharePointHostName-admin.sharepoint.com  -credential $credential -ClientId $AppId  -WarningAction Ignore
     } 
     elseif($CBA -eq $true)
     {
@@ -305,7 +323,7 @@ else
      else
     {
      
-     Connect-PnPOnline -Url https://$SharePointHostName-admin.sharepoint.com -WarningAction Ignore -Interactive
+     Connect-PnPOnline -Url https://$SharePointHostName-admin.sharepoint.com -ClientId $AppId -WarningAction Ignore -Interactive
     }
     If ($? -eq $true)
     {
