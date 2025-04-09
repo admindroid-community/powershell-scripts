@@ -23,6 +23,7 @@ Change Log
   V2.0 (Mar 10, 2025)  - Upgraded from MS Graph beta to production version
   V2.1 (Mar 21, 2025)  - Feature break due to module upgrade fixed.
   V2.2 (Mar 26, 2025) - Used 'Property' param to retrive user properties.
+  V2.3 (Apr 05, 2025) - Updated license friednly name with latest changes and converted it as CSV file
 
 
 For detailed Script execution: https://o365reports.com/2022/09/08/manage-365-licenses-using-ms-graph-powershell
@@ -177,7 +178,10 @@ Function main() {
     Connect_MgGraph
     $Result = ""  
     $Results = @() 
-    $FriendlyNameHash = Get-Content -Raw -Path .\LicenseFriendlyName.txt -ErrorAction Stop | ConvertFrom-StringData
+    $FriendlyNameHash = @{}
+    Import-Csv -Path .\LicenseFriendlyName.csv -ErrorAction Stop | ForEach-Object {
+    $FriendlyNameHash[$_.string_id] = $_.Product_Display_Name
+}
     $SkuPartNumberHash = @{} 
     $SkuIdHash = @{} 
     Get-MgSubscribedSku -All | Select-Object SkuPartNumber, SkuId | ForEach-Object {
