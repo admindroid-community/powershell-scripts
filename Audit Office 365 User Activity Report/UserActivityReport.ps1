@@ -13,6 +13,13 @@ Script Highlights:
 5.Automatically installs the EXO V2 module (if not installed already) upon your confirmation. 
 6.The script is scheduler friendly. I.e., Credential can be passed as a parameter instead of saving inside the script. 
 
+Change Log:
+~~~~~~~~~~~
+  V1.0 (Jan 07, 2021)  - File created
+  V1.1 (Dec 17, 2021)  - Minor usabilities
+  V2.0 (May 14, 2025)  - Removed MS Online module dependency, added support for certificate-based authentication, and extended audit log retrieval from 90 to 180 days.
+
+
 For detailed Script execution: https://o365reports.com/2021/01/06/export-office-365-user-activity-report-to-csv-using-powershell/
 ============================================================================================
 #>
@@ -25,15 +32,18 @@ Param
     [Nullable[DateTime]]$StartDate,
     [Nullable[DateTime]]$EndDate,
     [string]$UserID,
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint,
     [string]$AdminName,
     [string]$Password
 )
 
-#Check for EXO v2 module inatallation
+#Check for EXO module inatallation
 $Module = Get-Module ExchangeOnlineManagement -ListAvailable
 if($Module.count -eq 0) 
 { 
- Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
+ Write-Host Exchange Online PowerShell module is not available  -ForegroundColor yellow  
  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
  if($Confirm -match "[yY]") 
  { 
@@ -42,80 +52,54 @@ if($Module.count -eq 0)
  } 
  else 
  { 
-  Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
+  Write-Host EXO module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
   Exit
  }
 } 
 
-#Check for MSOnline module 
-$Module=Get-Module -Name MSOnline -ListAvailable  
-if($Module.count -eq 0) 
-{ 
- Write-Host MSOnline module is not available  -ForegroundColor yellow  
- $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
- if($Confirm -match "[yY]") 
- { 
-  Install-Module MSOnline 
-  Import-Module MSOnline
- } 
- else 
- { 
-  Write-Host MSOnline module is required to connect AzureAD.Please install module using Install-Module MSOnline cmdlet. 
-  Exit
- }
-} 
-
-#Connect Exchange Online with MFA
- if($MFA.IsPresent)
- {
-  Write-Host Connecting to Exchange Online...
-  Connect-ExchangeOnline
-  Write-Host Connecting to MSOnline module...
-  Connect-MsolService
- }
-
-#Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
-else
-{
+Write-Host Connecting to Exchange Online...
+ #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
  if(($AdminName -ne "") -and ($Password -ne ""))
  {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
   $Credential  = New-Object System.Management.Automation.PSCredential $AdminName,$SecuredPassword
+  Connect-ExchangeOnline -Credential $Credential
+ }
+ elseif($Organization -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+   Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint  -Organization $Organization -ShowBanner:$false
  }
  else
  {
-  $Credential=Get-Credential -Credential $null
+  Connect-ExchangeOnline
  }
- Write-Host Connecting to Exchange Online...
- Connect-ExchangeOnline -Credential $Credential
- Write-Host Connecting to MSonline module...
- Connect-MsolService -Credential $Credential
-}
 
-#Getting user activity for past 90 days
-if($Default.IsPresent)
+ $MaxStartDate=((Get-Date).AddDays(-179)).Date
+
+
+#Retrive audit log for the past 180 days
+if(($StartDate -eq $null) -and ($EndDate -eq $null))
 {
  $EndDate=(Get-Date).Date
- $StartDate= ((Get-Date).AddDays(-89)).Date
+ $StartDate=$MaxStartDate
 }
- 
-#Getting start date for Audit log  
+#Getting start date to audit export report
 While($true)
 {
  if ($StartDate -eq $null)
  {
-  $StartDate=Read-Host Enter start time for audit collection '(Eg:11/20/2019)'
+  $StartDate=Read-Host Enter start time for report generation '(Eg:12/15/2023)'
  }
  Try
  {
   $Date=[DateTime]$StartDate
-  if($Date -gt ((Get-Date).AddDays(-90)))
+  if($Date -ge $MaxStartDate)
   { 
    break
   }
   else
   {
-   Write-Host `nAudit log can be retrieved only for past 90 days. Please select a date after (Get-Date).AddDays(-90) -ForegroundColor Red
+   Write-Host `nAudit can be retrieved only for the past 180 days. Please select a date after $MaxStartDate -ForegroundColor Red
    return
   }
  }
@@ -126,12 +110,12 @@ While($true)
 }
 
 
-#Getting end date for Audit log
+#Getting end date to export audit report
 While($true)
 {
  if ($EndDate -eq $null)
  {
-  $EndDate=Read-Host Enter End time for audit collecton '(Eg: 11/20/2019)'
+  $EndDate=Read-Host Enter End time for report generation '(Eg: 12/15/2023)'
  }
  Try
  {
@@ -149,14 +133,8 @@ While($true)
  }
 }
 
-#Checking whether the user is available
-if((Get-MsolUser -UserPrincipalName $userID) -eq $null)
-{
- Write-Host User does not exist. Please check the user name.
- exit
-}
-
-$OutputCSV=".\UserActivityReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
+$Location=Get-Location
+$OutputCSV="$Location\UserActivityReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 $IntervalTimeInMinutes=1440    #$IntervalTimeInMinutes=Read-Host Enter interval time period '(in minutes)'
 $CurrentStart=$StartDate
 $CurrentEnd=$CurrentStart.AddMinutes($IntervalTimeInMinutes)
@@ -175,6 +153,13 @@ Write-Host `nRetrieving user activity log from $StartDate to $EndDate... -Foregr
 $i=0
 $ExportResult=""   
 $ExportResults=@()  
+
+#Getting user name
+if($UserID -eq "")
+{ 
+ $UserID=Read-Host Enter user UPN '(eg:John@contoso.com)'
+}
+
 while($true)
 { 
  #Write-Host Retrieving user activity log between StartDate $CurrentStart to EndDate $CurrentEnd ******* IntervalTime $IntervalTimeInMinutes minutes
@@ -183,7 +168,7 @@ while($true)
   Write-Host Start and end time are same.Please enter different time range -ForegroundColor Red
   Exit
  }
- #Write-Host !!!!!!!!!!!!!!
+ 
  #Getting audit log for given time range
  $Results=Search-UnifiedAuditLog -StartDate $CurrentStart -EndDate $CurrentEnd -UserIds $UserID -SessionId s -SessionCommand ReturnLargeSet -ResultSize 5000
  $ResultCount=($Results | Measure-Object).count
@@ -255,6 +240,10 @@ while($true)
  }
 }
 
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+ 
+
 If($AggregateResultCount -eq 0)
 {
  Write-Host No records found
@@ -266,9 +255,7 @@ else
  {
   Write-Host " The Output file available in:" -NoNewline -ForegroundColor Yellow
   Write-Host $OutputCSV 
-  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-  Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
-  $Prompt = New-Object -ComObject wscript.shell   
+   $Prompt = New-Object -ComObject wscript.shell   
   $UserInput = $Prompt.popup("Do you want to open output file?",`   
  0,"Open Output File",4)   
   If ($UserInput -eq 6)   
