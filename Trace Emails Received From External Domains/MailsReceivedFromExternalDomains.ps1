@@ -1,14 +1,14 @@
 ﻿<#
 =============================================================================================
 Name:           Trace Inbound External Emails in Exchange Online
-Version:        1.0
+Version:        1.1
 Website:        o365reports.com
 
 
 Script Highlights:  
 ~~~~~~~~~~~~~~~~~
 1. Exports emails received from external domains into a CSV file.
-2. Supports exporting emails within a specified 30-day time range.
+2. Supports exporting emails within a specified 90-day time range.
 3. Lists emails received from a specific external domain.
 4. Finds emails received from a specific external user.
 5. Audit emails received by a specific user from external domains.
@@ -20,6 +20,11 @@ Script Highlights:
  
 For detailed Script execution: https://o365reports.com/2025/06/03/trace-emails-received-from-external-domains-in-exchange-online
 
+Change Log
+~~~~~~~~~~
+
+    V1.0 (Jun 03, 2025) - File created
+    V1.1 (Jun 09, 2025) - Extended message tracing period from 30 to 90 days.
 ============================================================================================
 #>
 
@@ -41,7 +46,7 @@ param(
 )
 
 #--------------------------------------------------- Date Time Checking ---------------------------------------------------
-$MaxStartDate = ((Get-Date).AddDays(-30)).Date
+$MaxStartDate = ((Get-Date).AddDays(-90)).Date
 
 if (-not $StartDate -and -not $EndDate) {
     $EndDate = (Get-Date).Date
@@ -53,7 +58,7 @@ try {
     if ($EndDate) { $EndDate = [DateTime]$EndDate }
 
     if ($StartDate -lt $MaxStartDate) {
-        Write-Host "Error: MessageTrace can only be retrieved for the past 30 days. Select a date after $MaxStartDate" -ForegroundColor Red
+        Write-Host "Error: MessageTrace can only be retrieved for the past 90 days. Select a date after $MaxStartDate" -ForegroundColor Red
         Exit
     }
     if ($EndDate -lt $StartDate) {
