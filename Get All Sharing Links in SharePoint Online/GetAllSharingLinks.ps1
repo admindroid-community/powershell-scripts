@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:           Find All Sharing Links in SharePoint Online Using PowerShell  
-Version:        1.0
+Version:        1.1
 Website:        o365reports.com
 
 ~~~~~~~~~~~~~~~~~~
@@ -18,9 +18,16 @@ Script Highlights:
 9. Compatible with certificate-based authentication (CBA). 
 10.The script is scheduler friendly. 
 
-~~~~~~~~~~~~~~~~~~
+
+Change Log
+~~~~~~~~~~
+
+    V1.0 (Jun 10, 2025) - File created
+    V1.1 (Jun 12, 2025) - Added function call for PnP PowerShell module installation
+
+
 Note:
-~~~~~~~~~~~~~~~~~~
+~~~~~
 Make sure the app registration used for certificate based authentication is granted with Application permissions
 for "Files.Read.All" and "Sites.Read.All" to ensure it can retrieve the required details. Else, you will get the
 following error:"Get-PnPFileSharingLink: Either scp or roles claim need to be present in the token."
@@ -53,22 +60,22 @@ Param
 Function Installation-Module
 {
  $Module = Get-InstalledModule -Name PnP.PowerShell -MinimumVersion 1.12.0 -ErrorAction SilentlyContinue
- If($Module -eq $null){
- Write-Host SharePoint PnP PowerShell Module is not available -ForegroundColor Yellow
- $Confirm = Read-Host Are you sure you want to install module? [Yy] Yes [Nn] No
- If($Confirm -match "[yY]") 
- { 
-  Write-Host "Installing PnP PowerShell module..."
-  Install-Module PnP.PowerShell -Force -AllowClobber -Scope CurrentUser
-  Import-Module -Name Pnp.Powershell        
- } 
- Else
- { 
-  Write-Host PnP PowerShell module is required to connect SharePoint Online.Please install module using Install-Module PnP.PowerShell cmdlet. 
-  Exit
- }
-}
-    Write-Host `nConnecting to SharePoint Online...
+ If($Module -eq $null)
+ {
+  Write-Host SharePoint PnP PowerShell Module is not available -ForegroundColor Yellow
+  $Confirm = Read-Host Are you sure you want to install module? [Yy] Yes [Nn] No
+  If($Confirm -match "[yY]") 
+  { 
+   Write-Host "Installing PnP PowerShell module..."
+   Install-Module PnP.PowerShell -Force -AllowClobber -Scope CurrentUser
+   Import-Module -Name Pnp.Powershell        
+  } 
+  Else
+  { 
+   Write-Host PnP PowerShell module is required to connect SharePoint Online.Please install module using Install-Module PnP.PowerShell cmdlet. 
+   Exit
+  }
+ }   
 }
 
 #SPO Site connection 
@@ -79,6 +86,7 @@ Function Connection-Module
   [Parameter(Mandatory = $true)]
   [String] $Url
  )
+ Write-Host `nConnecting to SharePoint Online...
  if(($AdminName -ne "") -and ($Password -ne "") -and ($ClientId -ne ""))
  {
   $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
@@ -232,7 +240,7 @@ Function Get-SharedLinks
  }
 }
 
-
+Installation-Module
 $TimeStamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $ReportOutput = "$PSScriptRoot\SPO_SharingLinks_Report_ $TimeStamp.csv"
 $Global:ItemCount = 0
