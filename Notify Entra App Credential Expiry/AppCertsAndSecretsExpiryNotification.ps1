@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:           Send Microsoft Entra App Credentials Expiry Notifications  
-Version:        1.0
+Version:        1.1
 Website:        o365reports.com
 
 Script Highlights:  
@@ -14,6 +14,12 @@ Script Highlights:
 6. The script can be executed with an MFA-enabled account too.
 7. It can be executed with certificate-based authentication (CBA) too. 
 8. The script is scheduler-friendly.
+
+Change Log
+~~~~~~~~~~
+   V1.0 (Apr 29, 2025) - File created
+   V1.1 (Jun 14, 2025) - Minor code improvements.
+
 
 
 For detailed Script execution: https://o365reports.com/2025/04/29/send-entra-app-credential-expiry-notifications
@@ -35,55 +41,67 @@ Param
     [string]$CertificateThumbprint
 )
 
-
-$Date = Get-Date
 $CSVFilePath ="$(Get-Location)\AppCertsAndSecretsExpiryNotificationSummary_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 
-
-# Function to connect to Microsoft Graph
-function Connect_ToMgGraph {
-    # Check if Microsoft Graph module is installed
-    $MsGraphModule = Get-Module Microsoft.Graph -ListAvailable
-    if ($MsGraphModule -eq $null) {
-        Write-Host "`nImportant: Microsoft Graph module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-        $confirm = Read-Host "Are you sure you want to install Microsoft Graph module? [Y] Yes [N] No"
-        if ($confirm -match "[yY]") {
-            Write-Host "Installing Microsoft Graph module..."
-            Install-Module Microsoft.Graph -Scope CurrentUser -AllowClobber
-            Write-Host "Microsoft Graph module is installed in the machine successfully" -ForegroundColor Magenta 
-        } else {
-            Write-Host "Exiting. `nNote: Microsoft Graph module must be available in your system to run the script" -ForegroundColor Red
-            Exit
-        }
-    } 
-
-    Write-Host "`nConnecting to Microsoft Graph..."
-    
-    if (($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne "")) {
-        # Use certificate-based authentication if TenantId, ClientId, and CertificateThumbprint are provided
-        Connect-MgGraph -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -NoWelcome
+# Check if Microsoft Graph module is installed
+$MsGraphModule = Get-Module Microsoft.Graph -ListAvailable
+if ($MsGraphModule -eq $null) {
+    Write-Host "`nImportant: Microsoft Graph module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host "Are you sure you want to install Microsoft Graph module? [Y] Yes [N] No"
+    if ($confirm -match "[yY]") {
+        Write-Host "Installing Microsoft Graph module..."
+        Install-Module Microsoft.Graph -Scope CurrentUser -AllowClobber
+        Write-Host "Microsoft Graph module is installed in the machine successfully" -ForegroundColor Magenta 
     } else {
-        # Use delegated permissions (Scopes) if credentials are not provided
-        Connect-MgGraph -Scopes "Application.Read.All", "Mail.Send.Shared", "User.Read.All" -NoWelcome 
-    }
-
-    # Verify connection
-    if ((Get-MgContext) -ne $null) {
-        if ((Get-MgContext).Account -ne $null) {
-            Write-Host "Connected to Microsoft Graph PowerShell using account: $((Get-MgContext).Account)"
-        }
-        else {
-            Write-Host "Connected to Microsoft Graph PowerShell using certificate-based authentication."
-        }
-    } else {
-        Write-Host "Failed to connect to Microsoft Graph." -ForegroundColor Red
+        Write-Host "Exiting. `nNote: Microsoft Graph module must be available in your system to run the script" -ForegroundColor Red
         Exit
     }
+} 
+
+Write-Host "`nConnecting to Microsoft Graph..."
+    
+if (($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne "")) {
+    # Use certificate-based authentication if TenantId, ClientId, and CertificateThumbprint are provided
+    Connect-MgGraph -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -NoWelcome
+} else {
+    # Use delegated permissions (Scopes) if credentials are not provided
+    Connect-MgGraph -Scopes "Application.Read.All", "Mail.Send.Shared", "User.Read.All" -NoWelcome 
+}
+
+# Verify connection
+if ((Get-MgContext) -ne $null) {
+    if ((Get-MgContext).Account -ne $null) {
+        $LoggedInAccount = (Get-MgContext).Account
+        if([string]::IsNullOrEmpty($FromAddress)) {
+            $FromAddress = $LoggedInAccount
+        }
+        Write-Host "Connected to Microsoft Graph PowerShell using account: $($LoggedInAccount)"
+    }
+    else {
+        Write-Host "Connected to Microsoft Graph PowerShell using certificate-based authentication."
+        if ([string]::IsNullOrEmpty($FromAddress)) {
+            Write-Host "`nError: FromAddress is required when using certificate-based authentication." -ForegroundColor Red
+            Exit
+        }
+    }
+} else {
+    Write-Host "Failed to connect to Microsoft Graph." -ForegroundColor Red
+    Exit
 }
 
 
 # Function to Send Email
 function SendEmail {
+    $EmailAddresses = ($Recipients -split ",").Trim()
+    $toRecipients = @()
+    foreach ($Email in $EmailAddresses) {
+        $toRecipients += @{
+            emailAddress = @{
+                address = $Email
+            }
+        }
+    }
+
     $Script:TableContent += "</table>"
     $TableStyle = "<style>
         table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; }
@@ -109,22 +127,9 @@ function SendEmail {
             toRecipients = $toRecipients
         }
     }
-    Send-MgUserMail -UserId $FromAddress -BodyParameter $params
+
+    Send-MgUserMail -UserId $FromAddress -BodyParameter $params 
 }
-
-
-Connect_ToMgGraph
-$LoggedInAccount = (Get-MgContext).Account
-if ($LoggedInAccount -ne $null){ 
-    if ([string]::IsNullOrEmpty($FromAddress)) {
-        $FromAddress = $LoggedInAccount
-    }
-} else {
-    if ([string]::IsNullOrEmpty($FromAddress)) {
-        Write-Host "`nError: FromAddress is required when using certificate-based authentication." -ForegroundColor Red
-        Exit
-    }
-} 
 
 
 $ExportResult = $null   
@@ -132,14 +137,12 @@ $AppCount = 0
 $Script:ProcessedCount = 0
 $RequiredProperties=@('DisplayName','AppId','Id','KeyCredentials','PasswordCredentials','CreatedDateTime','SigninAudience')
 
-
 if(($CertificatesOnly.IsPresent) -or ($ClientSecretsOnly.IsPresent) -or ($SoonToExpireInDays -ne "")) {
     $SwitchPresent=$True
 }
 else {
     $SwitchPresent=$false
 }
-
 
 # Create an HTML table with data
 $Script:TableContent = "<table>"
@@ -159,16 +162,6 @@ Get-MgApplication -All -Property $RequiredProperties | ForEach-Object {
     $Owners=$AppOwners -join ","
     
     if($owners -eq "") { $Owners="-" }
-    
-    $EmailAddresses = ($Recipients -split ",").Trim()
-    $toRecipients = @()
-    foreach ($Email in $EmailAddresses) {
-        $toRecipients += @{
-            emailAddress = @{
-                address = $Email
-            }
-        }
-    }
         
     #Process through Secret keys
     if(!($CertificatesOnly.IsPresent) -or ($SwitchPresent -eq $false)) {
