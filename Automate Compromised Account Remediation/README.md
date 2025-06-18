@@ -1,4 +1,4 @@
-##Automate Compromised Account Remediation in Microsoft 365 Using PowerShell
+## Automate Compromised Account Remediation in Microsoft 365 Using PowerShell
 Automates 8 essential best practices for remediating a compromised Microsoft 365 account, helping you respond quickly and consistently.
 
 ![PowerShell Script Exceution sample](https://o365reports.com/wp-content/uploads/2025/06/automate-microsoft-365-account-remediation-using-powershell.png?v=1750164230)
