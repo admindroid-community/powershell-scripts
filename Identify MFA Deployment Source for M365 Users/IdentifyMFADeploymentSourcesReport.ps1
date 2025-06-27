@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:         Identify MFA Deployment Sources in Microsoft 365 Using PowerShell
-Version:      1.0
+Version:      2.0
 website:      o365reports.com
 
 ~~~~~~~~~~~~~~~~~~
@@ -11,7 +11,7 @@ Script Highlights:
 2. Helps you understand user MFA registration status (registered or not) to plan your MFA rollout campaigns efficiently.
 3. It specifically identifies MFA sources for external users as well. 
 4. The script checks which Conditional Access policies demand MFA and tells you if users have registered for that MFA method as required by those policies.
-5. Automatically install the missing required modules (Microsoft Graph Beta, MSOnline) with your confirmation.
+5. Automatically install the missing required module Microsoft Graph Beta with your confirmation.
 6. The script can be executed with an MFA-enabled account too.  
 7. Exports report results as a CSV file. 
 8. The script is scheduler-friendly, making it easy to automate.
@@ -20,12 +20,12 @@ Script Highlights:
 Change Log:
 ~~~~~~~~~~
 
-  V1.0 (July 3, 2024) - File created
+  V1.0 (Jul 03, 2024) - File created
   V1.1 (Nov 04, 2024) - Scope updation to resolve permission issue
+  v2.0 (Jun 27, 2025) - Removed MSOnline PowerShell module to retrieve per-user MFA status and used Graph API.
 
 
 For detailed Script execution: : https://o365reports.com/2024/06/26/identity-mfa-deployment-source-in-microsoft-365-using-powershell/
-
 
 
 ============================================================================================
@@ -34,36 +34,25 @@ param
 (    
      [string]$TenantId,
      [string]$AppId,
-     [string]$CertificateThumbprint,
-     [string]$UserName, 
-     [string]$Password
+     [string]$CertificateThumbprint
 )
 
 $ErrorActionPreference = "Stop"
-#Check for Module Availability
-function Check-ModuleAvailability 
-{
-    param (
-        [string]$ModuleName,
-        [string]$ModuleDisplayName
-    )
-    $module = Get-Module $ModuleName -ListAvailable
-    if ($module -eq $null) 
-    {
-        Write-Host "Important: $ModuleDisplayName module is unavailable. It is mandatory to have this module installed in the system to run the script successfully."
-        $confirm = Read-Host "Are you sure you want to install $ModuleDisplayName module? [Y] Yes [N] No"
-        if ($confirm -match "[yY]") 
-        {
-            Write-Host "Installing $ModuleDisplayName module..."
-            Install-Module $ModuleName -Scope CurrentUser -AllowClobber
-            Write-Host "$ModuleDisplayName module is installed in the machine successfully" -ForegroundColor Magenta
-        } 
-        else 
-        {
-            Write-Host "Exiting. `nNote: $ModuleDisplayName module must be available in your system to run the script" -ForegroundColor Red
-            Exit
-        }
-    }
+# Check if Microsoft Graph Beta module is installed
+$MsGraphModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+if($MsGraphModule -eq $null)
+{ 
+    Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
+    if($confirm -match "[yY]") { 
+        Write-host "Installing Microsoft Graph Beta module..."
+        Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
+        Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
+    } 
+    else { 
+        Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
+        Exit 
+    } 
 }
 
 function Process-ExternalUsers
@@ -152,80 +141,34 @@ function Get-UserIdsByRole {
     return $UserIds
 }
 
-# Check for Module Availabilit
-Check-ModuleAvailability -ModuleName "MsOnline" -ModuleDisplayName "MsOnline"
-Check-ModuleAvailability -ModuleName "Microsoft.Graph.Beta" -ModuleDisplayName "Microsoft Graph Beta"
-
 #Disconnect from the Microsoft Graph If already connected
 if (Get-MgContext) {
     Write-Host Disconnecting from the previous sesssion.... -ForegroundColor Yellow
     Disconnect-MgGraph | Out-Null
 }
 
-
-#Credentials check and Certificate check
-if(($UserName -ne "") -and ($Password -ne "")) 
-{ 
-  $SecuredPassword  = ConvertTo-SecureString -AsPlainText $Password -Force 
-  $Credential       = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword 
-  $CredentialPassed = $true
-} 
-
-if((($AppId -ne "") -and ($CertificateThumbPrint -ne "")) -and ($TenantId -ne ""))
-{
-  $CBA=$true
+Write-Host "`nConnecting to Microsoft Graph..."
+if(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
+{  
+    Connect-MgGraph -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -ErrorAction SilentlyContinue -ErrorVariable ConnectionError | Out-Null
+    if($ConnectionError -ne $null) {    
+        Write-Host $ConnectionError -Foregroundcolor Red
+        Exit
+    }
+    Write-Host "Connected to Microsoft Graph PowerShell using $((Get-MgContext).AppName) application."
 }
-
-#version check
-# Connecting to Microsoft Graph
-Write-Host "Connecting to Microsoft Graph..."
-try 
+else
 {
-    if($CBA -eq $true)
-    {
-        Connect-MgGraph -ApplicationId $AppId -TenantId $TenantId -CertificateThumbPrint $CertificateThumbprint
-        Write-Host Connected to Microsoft Graph PowerShell using (Get-MgContext).AppName application -ForegroundColor Yellow
+    Connect-MgGraph -Scopes 'User.Read.All','Policy.Read.all','Team.ReadBasic.All','Directory.Read.All','AuditLog.Read.All' -NoWelcome -ErrorAction SilentlyContinue -Errorvariable ConnectionError | Out-Null
+    if($ConnectionError -ne $null) {
+        Write-Host "$ConnectionError" -Foregroundcolor Red
+        Exit
     }
-    else
-    {
-        Connect-MgGraph -Scopes 'User.Read.All','Policy.Read.all','Policy.ReadWrite.SecurityDefaults','Team.ReadBasic.All','Directory.Read.All','AuditLog.Read.All' -NoWelcome
-        Write-Host Connected to Microsoft Graph PowerShell using (Get-MgContext).Account account -ForegroundColor Yellow
-    }
-}
-catch [Exception]
-{
-   Write-Host "Error: An error occurred while connecting to Microsoft Graph: $($_.Exception.Message)" -ForegroundColor Red
-   Exit
-}
-    
-#Connecting to Msonline
-Write-Host "Connecting to MSOnline......"
-try
-{
-    if($CredentialPassed -eq $true)
-    {
-        Connect-MsolService -Credential $Credential
-    }
-    elseif($CBA -eq $true)
-    {
-         Write-Host "MSonline module doesn't support certificate based authentication. Please enter the credential in the prompt"
-         Connect-MsolService
-    }
-    else
-    {
-        Connect-MsolService
-    }
-    Write-Host Connected to MSOnline -ForegroundColor Yellow
-}
-catch
-{ 
-    Write-Host "Error: An error occurred while connecting to MsOnline: $($_.Exception.Message)" -ForegroundColor Red
-    Exit
+    Write-Host "Connected to Microsoft Graph PowerShell using account: $((Get-MgContext).Account)"
 }
 
-#Get Users From Msonline
-$Users = Get-MsolUser -All | Select-Object ObjectId , StrongAuthenticationRequirements
-$MgBetaUsers  = Get-MgBetaUser -All | Sort-Object DisplayName
+Write-Host "`nRetrieving Entra Users..."
+$MgUsers  = Get-MgBetaUser -All | Sort-Object DisplayName
 #Check Security Default is enabled or not
 $SecurityDefault = (Get-MgBetaPolicyIdentitySecurityDefaultEnforcementPolicy).IsEnabled
 $DirectoryRole = Get-MgBetaDirectoryRole -All
@@ -236,7 +179,7 @@ $ProcessedUserCount =0
 
 #check for Security default if disabled start to process the Conditional access policies
 $PolicySetting = 'True'
-$TotalUser = $Users.count
+$TotalUser = $MgUsers.count
 if($SecurityDefault)
 {
    $PolicySetting = 'False'
@@ -258,8 +201,7 @@ else
     #Get the External users if it was specified in the policy
     if($Policies.Conditions.Users.IncludeGuestsOrExternalUsers -ne $null -or $Policies.Conditions.Users.ExcludeGuestsOrExternalUsers -ne $null)
     {
-        Write-Host "Getting Information about Exernal Users"
-        $ExternalUsers = $MgBetaUsers | where-object {$_.ExternalUserState -ne $null}
+        $ExternalUsers = $MgUsers | where-object {$_.ExternalUserState -ne $null}
                         $UsersinTenant = @{}
                         foreach($GuestUser in $ExternalUsers)
                         {
@@ -291,7 +233,7 @@ else
                         }
         $B2BGuest    = $ExternalUsers | where-object {$_.UserType -eq 'Guest'}
         $B2BMember   = $ExternalUsers | where-object {$_.UserType -ne 'Member'}
-        $LocalGuest  = $MgBetaUsers   | where-object { $_.ExternalUserState -eq $null -and $_.UserType -eq 'Guest'}
+        $LocalGuest  = $MgUsers   | where-object { $_.ExternalUserState -eq $null -and $_.UserType -eq 'Guest'}
 
         #B2B Direct connect
         $Groups = Get-MgBetaTeam -All
@@ -327,7 +269,6 @@ else
         "temporaryAccessPass"                 = @("TemporaryAccessPassOneTime", "TemporaryAccessPassMultiuse")
     }
 
-    Write-Host "Processing the policies..."
     # Loop through each policy
     foreach ( $Policy in $Policies) 
     {
@@ -346,7 +287,7 @@ else
                                     }
                                     elseif($Policy.Conditions.Users.IncludeUsers -eq 'All')
                                     {
-                                       $MgBetaUsers.Id 
+                                       $MgUsers.Id 
                                        $Check = $false
                                     }
             if($Check)
@@ -395,81 +336,71 @@ else
         $IncludedUsers = $IncludeId | Select-Object -Unique
     }
 }
+
 $ProcessedUserCount = 0
-Write-Host "Processing the Users"
 $FilePath = ".\MFA_Deployment_Sources_Report_$((Get-Date -format 'yyyy-MMM-dd-ddd hh-mm tt').ToString()).csv"
 
-#Now starts the Process of Checking various conditions for the users and Export to the .csv file in the D local storage
-foreach ($User in $MgBetaUsers) 
+#Now starts the Process of Checking various conditions for the users
+foreach ($User in $MgUsers) 
 {
-        $name  = @()
-        $ProcessedUserCount++
-        $percent = ($ProcessedUserCount/$TotalUser)*100
-        Write-Progress -Activity "`n    Processed user count: $ProcessedUserCount `n" -Status "Currently processing User: $($User.DisplayName)" -PercentComplete $percent
-        $Peruser = $Users | Where-Object {$_.ObjectID -contains $User.Id} 
-        # Get user authentication details
-        $UserAuthDetails   = $UserAuthenticationDetail | Where-Object { $_.UserPrincipalName -eq $User.UserPrincipalName }
-        $MethodsRegistered = if ($UserAuthDetails.MethodsRegistered -ne "") { $UserAuthDetails.MethodsRegistered -join ',' } else { 'None' }
-        $Name   += foreach($Pol in $Policies.DisplayName){if($UsersInPolicy[$pol] -contains $user.Id){$Pol}}
-        $PolicyName = $Name -join','
-        $MFAEnforce = @{
-           'User Display Name'         = $User.DisplayName
-           'User Principal Name'       = $User.UserPrincipalName
-           'MFA Enforced Via'          =  if($PerUser.StrongAuthenticationRequirements.State -eq 'Enforced' -and $PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Per User MFA , Conditional Access Policy'} 
-                                          elseif ( $PerUser.StrongAuthenticationRequirements.State -eq 'Enforced' -and $SecurityDefault -eq $true) { 'Per User MFA , Security Default' }
-                                          elseif ($PerUser.StrongAuthenticationRequirements.State -eq 'Enforced') { 'Per User MFA' } 
-                                          elseif ($SecurityDefault -eq $true) { 'Security Default' } 
-                                          elseif ($PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Conditional Access Policy'}elseif ($Peruser.BlockCredential -eq $true) {'SignIn Blocked'}else {'Disabled'}
-          'Is Registered MFA Supported in CA' = if($IncludedUsers -contains $User.Id){if($UserAuthDetails.IsMFARegistered -contains 'True'){if($PolicySetting -eq 'True' -and  $NotRegistered -notcontains $User.Id) {$true}elseif($Registered -contains $User.Id){$true}else{'False'}}else{'False'}}else{''}
-          'CA MFA Status'              = if($IncludedUsers -contains $User.Id){'Enabled'}else{'Disabled'}
-          'Assigned CA Policy'         = if($IncludedUsers -contains $User.Id){$PolicyName}else{''}
-          'Per User MFA Status'        =  if ($PerUser.StrongAuthenticationRequirements.State) { $PerUser.StrongAuthenticationRequirements.State } else { 'Disabled' }
-          'Security Default Status'    = if ($SecurityDefault -eq $false){'Disabled'} else{'Enabled'}
-          'MFA Registered'             = $UserAuthDetails.IsMFARegistered -contains 'True'
-          'Methods Registered'         = if($MethodsRegistered){$MethodsRegistered}else{'None'} 
-         }
-         $MFAEnforced = New-Object PSObject -Property $MFAEnforce
-         try
-         {
-            $MFAEnforced | Select-Object 'User Display Name','User Principal Name','MFA Registered','Methods Registered','MFA Enforced Via','Per User MFA Status','Security Default Status','CA MFA Status','Assigned CA Policy','Is Registered MFA Supported in CA' | Export-Csv -Path $FilePath -NoTypeInformation -Append
-         }
-         catch
-         {       
-            Write-Host "Error occurred While Exporting: $_" -ForegroundColor Red
-         }
- }
+    $name  = @()
+    $ProcessedUserCount++
+    $percent = ($ProcessedUserCount/$TotalUser)*100
+    Write-Progress -Activity "`n    Processed user count: $ProcessedUserCount `n" -Status "Currently processing User: $($User.DisplayName)" -PercentComplete $percent
+    $UserId = $User.Id
+    $Peruser = (Invoke-MgGraphRequest -Method GET -Uri "/beta/users/$UserId/authentication/requirements").perUserMfaState 
+    # Get user authentication details
+    $UserAuthDetails   = $UserAuthenticationDetail | Where-Object { $_.UserPrincipalName -eq $User.UserPrincipalName }
+    $MethodsRegistered = if ($UserAuthDetails.MethodsRegistered -ne "") { $UserAuthDetails.MethodsRegistered -join ',' } else { 'None' }
+    $Name   += foreach($Pol in $Policies.DisplayName){if($UsersInPolicy[$pol] -contains $user.Id){$Pol}}
+    $PolicyName = $Name -join','
+    $MFAEnforce = @{
+        'User Display Name'         = $User.DisplayName
+        'User Principal Name'       = $User.UserPrincipalName
+        'MFA Enforced Via'          =  if($PerUser -eq 'Enforced' -and $PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Per User MFA , Conditional Access Policy'} 
+                                        elseif ( $PerUser -eq 'Enforced' -and $SecurityDefault -eq $true) { 'Per User MFA , Security Default' } 
+                                        elseif ($PerUser -eq 'Enforced') { 'Per User MFA' } 
+                                        elseif ($SecurityDefault -eq $true) { 'Security Default' } 
+                                        elseif ($PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Conditional Access Policy'}
+                                        elseif ($User.AccountEnabled -eq $false) {'SignIn Blocked'}
+                                        else {'Disabled'}
+        'Is Registered MFA Supported in CA' = if($IncludedUsers -contains $User.Id){if($UserAuthDetails.IsMFARegistered -contains 'True'){if($PolicySetting -eq 'True' -and  $NotRegistered -notcontains $User.Id) {'True'}elseif($Registered -contains $User.Id){'True'}else{'False'}}else{'False'}}else{''}
+        'CA MFA Status'              = if($IncludedUsers -contains $User.Id){'Enabled'}else{'Disabled'}
+        'Assigned CA Policy'         = if($IncludedUsers -contains $User.Id){$PolicyName}else{''}
+        'Per User MFA Status'        =  if ($PerUser) { $PerUser } else { 'Disabled' }
+        'Security Default Status'    = if ($SecurityDefault -eq $false){'Disabled'} else{'Enabled'}
+        'MFA Registered'             = $UserAuthDetails.IsMFARegistered -contains 'True'
+        'Methods Registered'         = if($MethodsRegistered){$MethodsRegistered}else{'None'} 
+    }
 
- <#
-$Prompt = New-Object -ComObject wscript.shell   
-$UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)   
-If ($UserInput -eq 6)
-{   
-    Invoke-Item "$FilePath"   
+    $MFAEnforced = New-Object PSObject -Property $MFAEnforce
+    try
+    {
+        $MFAEnforced | Select-Object 'User Display Name','User Principal Name','MFA Registered','Methods Registered','MFA Enforced Via','Per User MFA Status','Security Default Status','CA MFA Status','Assigned CA Policy','Is Registered MFA Supported in CA' | Export-Csv -Path $FilePath -NoTypeInformation -Append
+    }
+    catch
+    {       
+        Write-Host "Error occurred While Exporting: $_" -ForegroundColor Red
+    }
 }
-     
-Write-Host "Report was generated Successfully"
-Write-Host "Total number of Users processed: $ProcessedUserCount"
+
 #Disconnect from the Microsoft Graph
 Disconnect-MgGraph | Out-Null
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
-#>
 
 #Open output file after execution
-Write-Host `nScript executed successfully
 if((Test-Path -Path $FilePath) -eq "True")
 {
     Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
-    Write-Host "Exported report has $ProcessedUserCount user(s)" -ForegroundColor cyan
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n
+    Write-Host "Exported report has $ProcessedUserCount user(s)" 
     $Prompt = New-Object -ComObject wscript.shell
     $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)
     if ($UserInput -eq 6)
     {
         Invoke-Item "$FilePath"
     }
-    Write-Host "Detailed report available in: " -NoNewline -ForegroundColor Yellow
- Write-Host $FilePath 
+    Write-Host `n"Detailed report available in: " -NoNewline -ForegroundColor Yellow
+    Write-Host $FilePath 
 }
 else
 {
