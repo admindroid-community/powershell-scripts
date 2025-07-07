@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:           Find All Team Channels with External Members in Microsoft 365   
-Version:        1.0
+Version:        1.1
 Website:        o365reports.com
 
 Script Highlights:  
@@ -15,6 +15,12 @@ Script Highlights:
 5. The script can be executed with an MFA-enabled account too.
 6. It can be executed with certificate-based authentication (CBA) too. 
 7. The script is schedular-friendly.
+
+Change log:
+~~~~~~~~~~~
+V1.0 (Feb 04, 2025) – File created.  
+V1.1 (Jul 07, 2025) – Due to issue in MS Graph PowerShell cmdlet, API call is used to retrieve external membership.  
+
 
 For detailed Script execution:  https://o365reports.com/2025/02/04/get-all-teams-channels-with-external-members/
 ============================================================================================
@@ -125,30 +131,37 @@ Get-MgTeam -Filter "$($TeamFilter)" -All | ForEach-Object {
         $ExternalMembers = @()
         $ExternalUserFound = $false
         Write-Progress -Activity "`n     Processed Teams count: $ProcessedTeamsCount"`n"  Processing Channel: $($ChannelDisplayName) from Team: $($TeamDisplayName)"
+        
+        #Get-MgTeamChannelMember -All -Team $TeamId -Channel $ChannelId | ForEach-Object {
+        try {
+            (Invoke-MgGraphRequest -Method GET -Uri "/v1.0/teams/$($TeamId)/channels/$($ChannelId)/members" -ErrorAction Stop).value | ForEach-Object {
+                $ExternalMemberTenantId = $_.tenantId
+                if (($ExternalMemberTenantId -ne $TenantId) -or ($_.roles -contains "guest")) {
+                    $ExternalMemberName  = $_.displayName
+                    $ExternalMemberEmail = $_.email
+                    $ExternalMemberGuid  = $_.userId
 
-        Get-MgTeamChannelMember -All -Team $TeamId -Channel $ChannelId | ForEach-Object {
-            $ExternalMemberTenantId  = $_.AdditionalProperties["tenantId"]
-            if (($ExternalMemberTenantId -ne $TenantId) -or ($_.Roles -contains "guest")){
-                $ExternalMemberName      = $_.DisplayName
-                $ExternalMemberEmail     = $_.AdditionalProperties["email"]
-                $ExternalMemberGuid      = $_.AdditionalProperties["userId"]
+                    if (($MembershipType -notin @("standard","private"))) { $MembershipType = "shared" }
 
-                if (($MembershipType -notin @("standard","private"))) { $MembershipType = "shared" }
+                    # Apply filters based on params
+                    if (!([string]::IsNullOrEmpty($MemberUPN)) -and ($MemberUPN -ne $ExternalMemberEmail)) { return }
+                    if (!([string]::IsNullOrEmpty($ChannelType)) -and ($ChannelType -ne $MembershipType)) { return }
 
-                # Apply filters based on params
-                if (!([string]::IsNullOrEmpty($MemberUPN)) -and ($MemberUPN -ne $ExternalMemberEmail)) { return }
-                if (!([string]::IsNullOrEmpty($ChannelType)) -and ($ChannelType -ne $MembershipType)) { return }
-
-                $ExternalUserFound = $true
-                $ExternalMembersCount++
-                $ExternalMembers += $ExternalMemberEmail 
-                Print_DetailedReportContent
+                    $ExternalUserFound = $true
+                    $ExternalMembersCount++
+                    $ExternalMembers += $ExternalMemberEmail 
+                    Print_DetailedReportContent
+                }
             }
+            if ($ExternalUserFound) {
+                $ExternalMembers = $ExternalMembers -join ", "
+                $TeamsChannelsWithExternalMembersCount++
+                Print_SummaryReportContent
+            }
+        
         }
-        if ($ExternalUserFound) {
-            $ExternalMembers = $ExternalMembers -join ", "
-            $TeamsChannelsWithExternalMembersCount++
-            Print_SummaryReportContent
+        catch {
+            Write-Host "Error occurred while fetching members for Channel: $($ChannelDisplayName) in Team: $($TeamDisplayName)."
         }
     }
 }
