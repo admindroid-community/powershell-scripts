@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:           Find & Export Microsoft 365 User License Assignment Paths using PowerShell 
-Version:        1.0
+Version:        2.0
 website:        o365reports.com
 
 ~~~~~~~~~~~~~~~~~~
@@ -20,6 +20,13 @@ Script Highlights:
 
 
 For detailed Script execution:  https://o365reports.com/2024/05/14/find-export-microsoft-365-user-license-assignment-paths-using-powershell/
+
+~~~~~~~~~~~
+Change Log:
+~~~~~~~~~~~
+V1.0 (May 17, 2024) – File created.  
+V2.0 (Aug 21, 2025) – Upgraded from the Graph beta module to the Graph module, implemented error handling for retrieving expired trial subscriptions, and upgraded to use new LicenseFriendlyName.csv for license mapping.
+
 ============================================================================================
 #>
 Param
@@ -36,7 +43,7 @@ Param
 Function Connect_MgGraph
 {
  #Check for module installation
- $Module=Get-Module -Name microsoft.graph.beta -ListAvailable
+ $Module=Get-Module -Name microsoft.graph -ListAvailable
  if($Module.count -eq 0) 
  { 
   Write-Host Microsoft Graph PowerShell SDK is not available  -ForegroundColor yellow  
@@ -44,11 +51,11 @@ Function Connect_MgGraph
   if($Confirm -match "[yY]") 
   { 
    Write-host "Installing Microsoft Graph PowerShell module..."
-   Install-Module Microsoft.Graph.beta -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
+   Install-Module Microsoft.Graph -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
   }
   else
   {
-   Write-Host "Microsoft Graph Beta PowerShell module is required to run this script. Please install module using Install-Module Microsoft.Graph cmdlet." 
+   Write-Host "Microsoft Graph PowerShell module is required to run this script. Please install module using 'Install-Module Microsoft.Graph' cmdlet." 
    Exit
   }
  }
@@ -75,27 +82,32 @@ Function Convert-FrndlyName {
         [Parameter(Mandatory=$true)]
         [Array]$InputIds
     )
-    $EasyName = $FriendlyNameHash[$SkuName]
+    $EasyName = $FriendlyNameHash[$InputIds]
    if(!($EasyName))
-   {$NamePrint = $SkuName}
+   {$NamePrint = $InputIds}
    else
    {$NamePrint = $EasyName}
    return $NamePrint
 }
+
 Connect_MgGraph
+
 $Location=Get-Location
 $ExportCSV="$Location\M365Users_LicenseAssignmentPath_Report_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm-ss` tt).ToString()).csv"
 $ExportResult=""   
-$ExportResults=@() 
-$PrintedUser=0 
+$ExportResults=@()
 
 #Get license in the organization and saving it as hash table
 $SKUHashtable=@{}
-Get-MgBetaSubscribedSku –All | foreach{
+Get-MgSubscribedSku –All | foreach{
  $SKUHashtable[$_.skuid]=$_.Skupartnumber
 }
-#Get friendly name of Subscription plan from external file
-$FriendlyNameHash=Get-Content -Raw -Path .\LicenseFriendlyName.txt -ErrorAction Stop | ConvertFrom-StringData
+#Get Licenses
+$FriendlyNameHash = @{}
+Import-Csv -Path .\LicenseFriendlyName.csv -ErrorAction Stop | ForEach-Object{
+    $FriendlyNameHash[$_.String_Id] = $_.Product_Display_Name
+}
+
 #Get friendly name of Service plan from external file
 $ServicePlanHash=@{}
 Import-Csv -Path .\ServicePlansFrndlyName.csv | ForEach-Object {
@@ -105,7 +117,8 @@ Import-Csv -Path .\ServicePlansFrndlyName.csv | ForEach-Object {
 $GroupNameHash=@{}
 #Process users
 $RequiredProperties=@('UserPrincipalName','DisplayName','EmployeeId','CreatedDateTime','AccountEnabled','Department','JobTitle','LicenseAssignmentStates','AssignedLicenses','SigninActivity')
-Get-MgBetaUser -All -Property $RequiredProperties | select $RequiredProperties | ForEach-Object {
+$Count=0
+Get-MgUser -All -Property $RequiredProperties | ForEach-Object {
  $Count++
  $Print=1
  $DirectlyAssignedLicense=@()
@@ -129,7 +142,6 @@ Get-MgBetaUser -All -Property $RequiredProperties | select $RequiredProperties |
   $InactiveDays = (New-TimeSpan -Start $LastSignIn).Days
  }
  $LicenseAssignmentStates=$_.LicenseAssignmentStates
-
  if($AccountEnabled -eq $true)
  {
   $AccountStatus='Enabled'
@@ -141,8 +153,15 @@ Get-MgBetaUser -All -Property $RequiredProperties | select $RequiredProperties |
 
  foreach($License in $licenseAssignmentStates)
  { 
-  $SkuName=$SkuHashtable[$License.SkuId]
-  $FriendlyName=Convert-FrndlyName -InputIds $SkuName
+  $SkuName=$SkuHashtable[$License.SkuId] #When activated trial ends, it will not be available in the Get-MgBetaSubscribedSKU. In that case, respective SKU name will be empty.
+  if($SkuName -ne $null)
+  {
+   $FriendlyName=Convert-FrndlyName -InputIds $SkuName
+  }
+  else
+  {
+   $FriendlyName=$License.SkuId
+  }
   $DisabledPlans=$License.DisabledPlans
   $ServicePlanNames=@()
   if($DisabledPlans.count -ne 0 )
@@ -159,7 +178,7 @@ Get-MgBetaUser -All -Property $RequiredProperties | select $RequiredProperties |
   }
   $DisabledPlans=$ServicePlanNames -join ","
   $State=$License.State
-  $Error=$License.Error
+  $LicenseError=$License.Error
  
   #Filter for users with license assignment errors
   if($FindUsersWithLicenseAssignmentErrors.IsPresent -and ($State -eq "Active"))
@@ -195,67 +214,36 @@ Get-MgBetaUser -All -Property $RequiredProperties | select $RequiredProperties |
    }
    else
    {
-    $GroupName=(Get-MgBetagroup -GroupId $AssignedByGroup).DisplayName
+    $GroupName=(Get-MgGroup -GroupId $AssignedByGroup).DisplayName
     $GroupNameHash[$AssignedByGroup]=$GroupName
    }
   }
   if($Print -eq 1)
   {
-   $ExportResult=[PSCustomObject]@{'Display Name'=$DisplayName;'UPN'=$UPN;'License Assignment Path'=$LicenseAssignmentPath;'Sku Name'=$SkuName;'Sku_FriendlyName'=$FriendlyName;'Disabled Plans'=$DisabledPlans;'Assigned via(group name)'=$GroupName;'State'=$State;'Error'=$Error;'Last Signin Time'=$LastSignIn;'Inactive Days'=$InactiveDays;'Account Status'=$AccountStatus;'Department'=$Department;'Job Title'=$JobTitle}
+   $ExportResult=[PSCustomObject]@{'Display Name'=$DisplayName;'UPN'=$UPN;'License Assignment Path'=$LicenseAssignmentPath;'Sku Name'=$SkuName;'Sku_FriendlyName'=$FriendlyName;'Disabled Plans'=$DisabledPlans;'Assigned via(group name)'=$GroupName;'State'=$State;'Error'=$LicenseError;'Last Signin Time'=$LastSignIn;'Inactive Days'=$InactiveDays;'Account Status'=$AccountStatus;'Department'=$Department;'Job Title'=$JobTitle}
    $ExportResult | Export-Csv -Path $ExportCSV -Notype -Append
   }
  }
 }
+
+Disconnect-MgGraph | Out-Null
+
 #Open output file after execution
-Write-Host `nScript executed successfully
+Write-Host `nScript executed successfully.
 if((Test-Path -Path $ExportCSV) -eq "True")
 {
     Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to access 3,000+ reports and 450+ management actions across your Microsoft 365 environment. ~~" -ForegroundColor Green `n`n
     $Prompt = New-Object -ComObject wscript.shell
     $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)
     if ($UserInput -eq 6)
     {
         Invoke-Item "$ExportCSV"
     }
-    Write-Host "Detailed report available in: $ExportCSV" -ForegroundColor Cyan
+    Write-Host `nDetailed report available in:  -NoNewline -ForegroundColor Yellow
+    Write-Host $ExportCSV
 }
 else
 {
     Write-Host "No user found" -ForegroundColor Red
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
