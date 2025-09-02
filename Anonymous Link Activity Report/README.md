@@ -12,3 +12,14 @@ The script exports an output CSV file that looks like the screenshot below.
 Looking for more in-depth reporting? [AdminDroid Microsoft 365 reporting tool](https://admindroid.com/?src=GitHub) offers an extensive collection of over 1800 out-of-the-box reports and dashboards. It’s the perfect complement to your PowerShell scripts.
 
 *Gain Better Control Over Anonymous Links with AdminDroid:<https://demo.admindroid.com/#/1/11/reports/22058/1/20>*
+
+##Update
+Key updates include:
+
+Added a -Help switch for usage instructions.
+Improved module installation and import logic.
+Enhanced connection handling for Exchange Online (MFA and non-MFA).
+Standardized date and parameter validation.
+Improved output formatting and CSV export.
+Added error handling for audit log retrieval and connection steps.
+Ensured clean disconnect from Exchange Online.
