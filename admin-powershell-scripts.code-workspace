@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"uri": "vscode-vfs://github/alpeshnakar/admin-powershell-scripts"
+		},
+		{
+			"name": "admin-powershell-scripts",
+			"path": "."
+		}
+	],
+	"settings": {
+		"powershell.cwd": "admin-powershell-scripts"
+	}
+}
