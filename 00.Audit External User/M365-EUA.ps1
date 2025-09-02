@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+#Requires -Version 5.1
 #Requires -Modules Microsoft.Graph, PnP.PowerShell, ExchangeOnlineManagement
 
 <#
@@ -9,36 +9,117 @@
 .AUTHOR
     Microsoft 365 Security SME
 .VERSION
-    2.0.0
+    2.0.1
 .NOTES
     Implements zero-trust security model with comprehensive error handling and compliance reporting
+    
+.PARAMETER TenantId
+    The Azure AD Tenant ID (optional)
+    
+.PARAMETER OutputPath
+    Directory path for audit reports (default: .\AuditReports)
+    
+.PARAMETER IncludeFileAnalysis
+    Include analysis of files created by external users
+    
+.PARAMETER DetailedPermissions
+    Include detailed permission analysis for SharePoint sites
+    
+.PARAMETER DaysToAudit
+    Number of days to look back for audit data (default: 90)
+    
+.PARAMETER SpecificSites
+    Array of specific SharePoint site URLs to audit
+    
+.PARAMETER ExportIndividualReports
+    Export separate detailed reports for each service
+    
+.EXAMPLE
+    .\M365-EUA.ps1 -OutputPath "C:\AuditReports" -DaysToAudit 30
+    
+.EXAMPLE
+    .\M365-EUA.ps1 -IncludeFileAnalysis -DetailedPermissions -ExportIndividualReports
 #>
 
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, HelpMessage = "Azure AD Tenant ID")]
+    [ValidateNotNullOrEmpty()]
     [string]$TenantId = "",
     
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, HelpMessage = "Output directory for audit reports")]
+    [ValidateNotNullOrEmpty()]
     [string]$OutputPath = ".\AuditReports",
     
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, HelpMessage = "Include analysis of files created by external users")]
     [switch]$IncludeFileAnalysis,
     
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, HelpMessage = "Include detailed permission analysis")]
     [switch]$DetailedPermissions,
     
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, HelpMessage = "Number of days to audit (default: 90)")]
+    [ValidateRange(1, 365)]
     [int]$DaysToAudit = 90,
     
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, HelpMessage = "Specific SharePoint sites to audit")]
+    [ValidateNotNull()]
     [string[]]$SpecificSites = @(),
     
-    [Parameter(Mandatory = $false)]
+    [Parameter(Mandatory = $false, HelpMessage = "Export individual detailed reports")]
     [switch]$ExportIndividualReports
 )
 
 #region Configuration and Initialization
+
+# 🔧 Module Installation and Validation
+function Test-RequiredModules {
+    [CmdletBinding()]
+    param()
+    
+    $requiredModules = @(
+        @{ Name = "Microsoft.Graph"; MinVersion = "1.0.0" }
+        @{ Name = "PnP.PowerShell"; MinVersion = "1.0.0" }
+        @{ Name = "ExchangeOnlineManagement"; MinVersion = "2.0.0" }
+    )
+    
+    $allModulesAvailable = $true
+    
+    foreach ($module in $requiredModules) {
+        Write-Host "Checking module: $($module.Name)..." -ForegroundColor Cyan
+        
+        $installedModule = Get-Module -Name $module.Name -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1
+        
+        if (-not $installedModule) {
+            Write-Warning "Module '$($module.Name)' is not installed."
+            $install = Read-Host "Would you like to install it? (Y/N)"
+            
+            if ($install -match '^[Yy]') {
+                try {
+                    Write-Host "Installing $($module.Name)..." -ForegroundColor Yellow
+                    Install-Module -Name $module.Name -Scope CurrentUser -Force -AllowClobber
+                    Write-Host "✅ $($module.Name) installed successfully" -ForegroundColor Green
+                }
+                catch {
+                    Write-Error "Failed to install $($module.Name): $($_.Exception.Message)"
+                    $allModulesAvailable = $false
+                }
+            }
+            else {
+                Write-Error "Module '$($module.Name)' is required but not installed."
+                $allModulesAvailable = $false
+            }
+        }
+        else {
+            Write-Host "✅ $($module.Name) version $($installedModule.Version) is available" -ForegroundColor Green
+        }
+    }
+    
+    if (-not $allModulesAvailable) {
+        throw "One or more required modules are not available. Please install them and try again."
+    }
+    
+    return $true
+}
 
 # 🔧 Global Configuration
 $Global:AuditConfig = @{
@@ -699,9 +780,6 @@ function Get-GuestExpiration {
     try {
         Write-AuditLog "⏰ Analyzing guest expiration settings..." -Level Info
         
-        # Get tenant-level guest settings
-        $tenantSettings = Get-MgPolicyAuthorizationPolicy
-        
         $guestExpirationReport = [System.Collections.ArrayList]::new()
         
         foreach ($user in $ExternalUsers) {
@@ -1018,12 +1096,20 @@ function Start-ExternalUserAudit {
         Write-Host @"
 ╔══════════════════════════════════════════════════════════════╗
 ║   Microsoft 365 External User Comprehensive Audit Tool       ║
-║                     Version 2.0.0                            ║
+║                     Version 2.0.1                            ║
 ╚══════════════════════════════════════════════════════════════╝
 "@ -ForegroundColor Cyan
         
         Write-AuditLog "Starting Microsoft 365 External User Audit..." -Level Info
         Write-AuditLog "Output Path: $OutputPath" -Level Info
+        Write-AuditLog "Days to Audit: $DaysToAudit" -Level Info
+        Write-AuditLog "Include File Analysis: $IncludeFileAnalysis" -Level Info
+        Write-AuditLog "Detailed Permissions: $DetailedPermissions" -Level Info
+        Write-AuditLog "Export Individual Reports: $ExportIndividualReports" -Level Info
+        
+        # Step 0: Check Required Modules
+        Write-AuditLog "Step 0/7: Checking required modules..." -Level Info
+        Test-RequiredModules
         
         # Step 1: Authentication
         Write-AuditLog "Step 1/7: Authenticating to Microsoft 365..." -Level Info
@@ -1035,8 +1121,11 @@ function Start-ExternalUserAudit {
         
         if ($externalUsers.Count -eq 0) {
             Write-AuditLog "No external users found in the tenant" -Level Warning
-            return
+            Write-Host "`n⚠️  No external users found in the tenant. Audit complete." -ForegroundColor Yellow
+            return $null
         }
+        
+        Write-AuditLog "Found $($externalUsers.Count) external users to analyze" -Level Success
         
         # Step 3: Analyze SharePoint Access
         Write-AuditLog "Step 3/7: Analyzing SharePoint site access..." -Level Info
@@ -1059,6 +1148,7 @@ function Start-ExternalUserAudit {
         $guestExpiration = Get-GuestExpiration -ExternalUsers $externalUsers
         
         # Generate Reports
+        Write-AuditLog "Generating comprehensive audit reports..." -Level Info
         $reportPath = Export-AuditReport -ExternalUsers $externalUsers `
                                         -SharingSettings $sharingSettings `
                                         -GuestExpiration $guestExpiration
@@ -1070,19 +1160,13 @@ function Start-ExternalUserAudit {
         Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Green
         Write-Host "`n📊 Audit Statistics:" -ForegroundColor Cyan
         Write-Host "   • External Users Found: $($externalUsers.Count)" -ForegroundColor White
-        Write-Host "   • SharePoint Sites Analyzed: $Global:AuditConfig.ProcessedItems" -ForegroundColor White
+        Write-Host "   • SharePoint Sites Analyzed: $($Global:AuditConfig.ProcessedItems)" -ForegroundColor White
         Write-Host "   • Execution Time: $((Get-Date) - $Global:AuditConfig.StartTime)" -ForegroundColor White
         Write-Host "   • Warnings: $($Global:AuditConfig.WarningLog.Count)" -ForegroundColor Yellow
         Write-Host "   • Errors: $($Global:AuditConfig.ErrorLog.Count)" -ForegroundColor Red
         Write-Host "`n📁 Reports Generated:" -ForegroundColor Cyan
         Write-Host "   $OutputPath" -ForegroundColor White
         Write-Host "`n✅ Audit complete! Please review the generated reports." -ForegroundColor Green
-        
-        # Disconnect services
-        Write-AuditLog "Disconnecting from Microsoft 365 services..." -Level Info
-        Disconnect-MgGraph -ErrorAction SilentlyContinue
-        Disconnect-PnPOnline -ErrorAction SilentlyContinue
-        Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue
         
         return $reportPath
     }
@@ -1092,11 +1176,27 @@ function Start-ExternalUserAudit {
         # Export error log
         if ($Global:AuditConfig.ErrorLog.Count -gt 0) {
             $errorLogPath = Join-Path $OutputPath "ErrorLog_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
+            if (-not (Test-Path $OutputPath)) {
+                New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
+            }
             $Global:AuditConfig.ErrorLog | ConvertTo-Json -Depth 5 | Out-File -FilePath $errorLogPath
             Write-Host "`n❌ Errors were encountered. Error log saved to: $errorLogPath" -ForegroundColor Red
         }
         
         throw
+    }
+    finally {
+        # Disconnect services
+        Write-AuditLog "Disconnecting from Microsoft 365 services..." -Level Info
+        try {
+            Disconnect-MgGraph -ErrorAction SilentlyContinue
+            Disconnect-PnPOnline -ErrorAction SilentlyContinue
+            Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue
+            Write-AuditLog "✅ Services disconnected successfully" -Level Success
+        }
+        catch {
+            Write-AuditLog "Warning: Some services may not have disconnected properly" -Level Warning
+        }
     }
 }
 
