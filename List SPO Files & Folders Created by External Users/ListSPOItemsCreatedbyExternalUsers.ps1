@@ -38,6 +38,53 @@ param
    [Switch] $Help
 )
 
+<<<<<<< HEAD
+if ($Help) {
+    Write-Host @"
+SYNOPSIS
+    Get SharePoint Files & Folders Created By External Users Using PowerShell
+
+DESCRIPTION
+    This script retrieves all files and folders created by external users in SharePoint Online.
+    The script automatically handles PnP App Registration using a pre-configured Client ID.
+
+PARAMETERS
+    -FoldersOnly        : Show only folders created by external users
+    -FilesOnly          : Show only files created by external users  
+    -CreatedBy          : Filter by specific external user email
+    -UserName           : Username for authentication
+    -Password           : Password for authentication
+    -ClientId           : Client ID for app authentication (default: afe1b358-534b-4c96-abb9-ecea5d5f2e5d)
+    -CertificateThumbprint : Certificate thumbprint for authentication
+    -TenantName         : Tenant name (e.g., 'contoso' for contoso.com)
+    -SiteAddress        : Specific site URL to scan
+    -SitesCsv          : CSV file with list of sites to scan
+    -Help              : Show this help message
+
+AUTHENTICATION
+    The script uses a pre-registered PnP App with Client ID: afe1b358-534b-4c96-abb9-ecea5d5f2e5d
+    If this app is not available, the script will attempt to register a new one automatically.
+
+EXAMPLES
+    # Scan all sites (requires admin permissions)
+    .\ListSPOItemsCreatedbyExternalUsers.ps1
+
+    # Scan specific site
+    .\ListSPOItemsCreatedbyExternalUsers.ps1 -SiteAddress "https://tenant.sharepoint.com/sites/sitename"
+
+    # Show only folders with custom Client ID
+    .\ListSPOItemsCreatedbyExternalUsers.ps1 -FoldersOnly -ClientId "your-client-id" -SiteAddress "https://tenant.sharepoint.com/sites/sitename"
+
+    # Use certificate authentication
+    .\ListSPOItemsCreatedbyExternalUsers.ps1 -TenantName "yourtenant" -ClientId "your-client-id" -CertificateThumbprint "cert-thumbprint"
+"@ -ForegroundColor Cyan
+    exit 0
+}
+
+# Default PnP App Registration Client ID
+$DefaultPnPClientId = "afe1b358-534b-4c96-abb9-ecea5d5f2e5d"
+
+=======
 if ($Help) {
     Write-Host @"
 SYNOPSIS
@@ -86,6 +133,7 @@ EXAMPLES
 # Default PnP App Registration Client ID
 $DefaultPnPClientId = "afe1b358-534b-4c96-abb9-ecea5d5f2e5d"
 
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
 #Check for SharePoint PnPPowerShellOnline module availability
 $PnPOnline = (Get-Module PnP.PowerShell -ListAvailable).Name
 if($null -eq $PnPOnline)
@@ -105,6 +153,59 @@ if($null -eq $PnPOnline)
   }  
 }
 
+<<<<<<< HEAD
+# Function to check and register PnP App if needed
+function Initialize-PnPApp {
+    param(
+        [string]$TenantName
+    )
+    
+    try {
+        # If no ClientId provided in parameters, use the default one
+        if ([string]::IsNullOrEmpty($script:ClientId)) {
+            $script:ClientId = $DefaultPnPClientId
+            Write-Host "Using default PnP Client ID: $DefaultPnPClientId" -ForegroundColor Yellow
+        }
+        
+        # Test if the app registration works by attempting a connection
+        $testUrl = "https://$TenantName.sharepoint.com/"
+        Write-Host "Testing PnP App registration..." -ForegroundColor Cyan
+        
+        try {
+            Connect-PnPOnline -Url $testUrl -ClientId $script:ClientId -Interactive -WarningAction SilentlyContinue
+            Write-Host "✓ PnP App registration is working correctly!" -ForegroundColor Green
+            Disconnect-PnPOnline -ErrorAction SilentlyContinue
+            return $true
+        }
+        catch {
+            Write-Host "⚠ PnP App registration test failed. Attempting to register..." -ForegroundColor Yellow
+            
+            # Register PnP Management Shell Access
+            Write-Host "Registering PnP Management Shell Access..." -ForegroundColor Magenta
+            $registration = Register-PnPManagementShellAccess
+            
+            if ($registration) {
+                Write-Host "✓ PnP Management Shell registered successfully!" -ForegroundColor Green
+                # Update ClientId if registration returned one
+                if ($registration.ClientId) {
+                    $script:ClientId = $registration.ClientId
+                    Write-Host "New Client ID registered: $($script:ClientId)" -ForegroundColor Cyan
+                }
+                return $true
+            } else {
+                Write-Host "✗ Failed to register PnP Management Shell" -ForegroundColor Red
+                return $false
+            }
+        }
+    }
+    catch {
+        Write-Host "Error during PnP App initialization: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
+#Connecting to  SharePoint PnPPowerShellOnline module.......
+=======
 # Function to check and register PnP App if needed
 function Initialize-PnPApp {
     param(
@@ -156,9 +257,14 @@ function Initialize-PnPApp {
 }
 
 #Connecting to SharePoint PnPPowerShellOnline module
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
 Write-Host "Connecting to SharePoint PnPPowerShellOnline module..." -ForegroundColor Cyan
+<<<<<<< HEAD
+function Connect-SharePoint
+=======
 
 function Connect-SharePoint
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
 {
     param
     (
@@ -215,6 +321,19 @@ if (-not $pnpInitialized) {
 
 # Check if we have a specific site address or if we need admin center access
 $AdminUrl = "https://$TenantName.sharepoint.com/"
+<<<<<<< HEAD
+
+# Only connect to admin center if we're going to enumerate all sites
+if($SiteAddress -eq "" -and $SitesCsv -eq "") {
+    Write-Host "Connecting to SharePoint Admin Center..." -ForegroundColor Yellow
+    $connected = Connect-SharePoint -Url $AdminUrl
+    if (-not $connected) {
+        Write-Host "Failed to connect to SharePoint Admin Center. You may not have admin permissions." -ForegroundColor Red
+        Write-Host "Try running the script with -SiteAddress parameter to specify a specific site." -ForegroundColor Yellow
+        exit 1
+    }
+}
+=======
 
 # Only connect to admin center if we're going to enumerate all sites
 if($SiteAddress -eq "" -and $SitesCsv -eq "") {
@@ -227,6 +346,7 @@ if($SiteAddress -eq "" -and $SitesCsv -eq "") {
     }
 }
 
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
 $OutputCSV = "./SPO - Files & Folders Created By External Users " + ((Get-Date -format "MMM-dd hh-mm-ss tt").ToString()) + ".csv"
 
 #Collecting the data and exporting it to a CSV file
@@ -309,7 +429,11 @@ function Get-ExternalUserItems
     }
     catch
     {
+<<<<<<< HEAD
+        Write-Host "Error occurred $($SiteUrl) : $($_.Exception.Message)" -ForegroundColor Red;
+=======
         Write-Host "Error occurred processing $($SiteUrl) : $($_.Exception.Message)" -ForegroundColor Red;
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
     }
 }
 
@@ -348,10 +472,18 @@ elseif($SitesCsv -ne "")
     }
     catch
     {
+<<<<<<< HEAD
+        Write-Host "Error occurred : $($_.Exception.Message)" -ForegroundColor Red;
+=======
         Write-Host "Error occurred processing CSV : $($_.Exception.Message)" -ForegroundColor Red;
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
     }
 }  
+<<<<<<< HEAD
+#To retrieve the data for site present in our admin center
+=======
 #To retrieve the data for sites present in our admin center
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
 else
 {
     try {
@@ -388,6 +520,14 @@ else
 }
 
 #Disconnect the sharePoint PnPOnline module
+<<<<<<< HEAD
+try {
+    Disconnect-PnPOnline
+}
+catch {
+    # Ignore disconnect errors
+}
+=======
 try {
     Disconnect-PnPOnline
     Write-Host "Disconnected from SharePoint Online" -ForegroundColor Cyan
@@ -395,3 +535,4 @@ try {
 catch {
     # Ignore disconnect errors
 }
+>>>>>>> 7d39174083cc7036b9c7caebd75e3153b6c51298
