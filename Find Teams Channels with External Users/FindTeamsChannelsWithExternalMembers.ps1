@@ -168,8 +168,6 @@ Get-MgTeam -Filter "$($TeamFilter)" -All | ForEach-Object {
 # Disconnect from Microsoft Graph
 Disconnect-MgGraph | Out-Null
 
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1900+ Microsoft 365 reports. ~~" -ForegroundColor Green
 
 # Open output file after execution 
 if((Test-Path -Path $DetailedReport) -eq "True") {
