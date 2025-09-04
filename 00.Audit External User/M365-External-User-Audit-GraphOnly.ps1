@@ -54,71 +54,56 @@ function Install-RequiredModules {
     [CmdletBinding()]
     param()
     
-    Write-Host "🔧 Checking and installing Microsoft Graph module..." -ForegroundColor Cyan
+    Write-Host "🔧 Checking Microsoft Graph module..." -ForegroundColor Cyan
     
-    # Remove all potentially conflicting modules first
-    $conflictingModules = @(
-        "Microsoft.Graph*",
-        "ExchangeOnlineManagement",
-        "PnP.PowerShell",
-        "AzureAD*",
-        "MSOnline"
-    )
-    
-    foreach ($modulePattern in $conflictingModules) {
-        Get-Module -Name $modulePattern | ForEach-Object {
-            Write-Host "Removing loaded module: $($_.Name)" -ForegroundColor Yellow
-            Remove-Module -Name $_.Name -Force -ErrorAction SilentlyContinue
-        }
+    # Check if Microsoft Graph module is already loaded
+    $loadedGraphModule = Get-Module -Name "Microsoft.Graph" -ErrorAction SilentlyContinue
+    if ($loadedGraphModule) {
+        Write-Host "✅ Microsoft Graph module already loaded (version $($loadedGraphModule.Version))" -ForegroundColor Green
+        return
     }
     
-    # Only Microsoft Graph module is required
-    $requiredModule = @{ Name = "Microsoft.Graph"; ExactVersion = "1.28.0" }
+    # Check for required Microsoft Graph module
+    Write-Host "Checking for Microsoft Graph module..." -ForegroundColor Cyan
     
-    Write-Host "Checking module: $($requiredModule.Name)..." -ForegroundColor Cyan
-    
-    $installedModule = Get-Module -Name $requiredModule.Name -ListAvailable | 
-        Where-Object { $_.Version -eq [Version]$requiredModule.ExactVersion } | 
+    $installedModule = Get-Module -Name "Microsoft.Graph" -ListAvailable | 
+        Where-Object { $_.Version -ge [Version]"1.0.0" } | 
+        Sort-Object Version -Descending |
         Select-Object -First 1
     
     if (-not $installedModule) {
-        Write-Host "Installing $($requiredModule.Name)..." -ForegroundColor Yellow
+        Write-Host "Installing Microsoft Graph module..." -ForegroundColor Yellow
         try {
             $installParams = @{
-                Name = $requiredModule.Name
-                RequiredVersion = $requiredModule.ExactVersion
+                Name = "Microsoft.Graph"
                 Scope = "CurrentUser"
                 Force = $true
                 AllowClobber = $true
             }
             
             Install-Module @installParams
-            Write-Host "✅ $($requiredModule.Name) installed successfully" -ForegroundColor Green
+            Write-Host "✅ Microsoft Graph module installed successfully" -ForegroundColor Green
+            
+            # Get the newly installed module
+            $installedModule = Get-Module -Name "Microsoft.Graph" -ListAvailable | 
+                Sort-Object Version -Descending |
+                Select-Object -First 1
         }
         catch {
-            Write-Host "❌ Failed to install $($requiredModule.Name): $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "❌ Failed to install Microsoft Graph module: $($_.Exception.Message)" -ForegroundColor Red
             throw "Microsoft Graph module is required for this audit script"
         }
     }
     else {
-        Write-Host "✅ $($requiredModule.Name) version $($installedModule.Version) is available" -ForegroundColor Green
+        Write-Host "✅ Microsoft Graph module version $($installedModule.Version) is available" -ForegroundColor Green
     }
     
-    # Import Microsoft Graph module
+    # Import Microsoft Graph module if not already loaded
     try {
         Write-Host "Importing Microsoft Graph module..." -ForegroundColor Cyan
         
-        $graphModule = Get-Module -Name "Microsoft.Graph" -ListAvailable | 
-            Where-Object { $_.Version -eq "1.28.0" } | 
-            Select-Object -First 1
-        
-        if ($graphModule) {
-            Import-Module -Name $graphModule.Path -Force -Global
-            Write-Host "✅ Microsoft Graph 1.28.0 imported successfully" -ForegroundColor Green
-        }
-        else {
-            throw "Microsoft Graph module version 1.28.0 not found"
-        }
+        Import-Module -Name "Microsoft.Graph" -Force -Global -ErrorAction Stop
+        Write-Host "✅ Microsoft Graph module imported successfully" -ForegroundColor Green
     }
     catch {
         Write-Host "❌ Failed to import Microsoft Graph module: $($_.Exception.Message)" -ForegroundColor Red
@@ -828,7 +813,7 @@ function Start-ExternalUserAudit {
         Write-Host "Output Path: $OutputPath" -ForegroundColor Cyan
         
         # Step 0: Validate and install required modules
-        Write-Host "Step 0/5: Validating Microsoft Graph module..." -ForegroundColor Cyan
+        Write-Host "Step 0/5: Checking Microsoft Graph module..." -ForegroundColor Cyan
         Install-RequiredModules
         
         # Step 1: Authentication
