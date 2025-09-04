@@ -2,16 +2,15 @@
 
 <#
 .SYNOPSIS
-    Comprehensive Microsoft 365 External User Audit Script
+    Microsoft 365 External User Audit Script - Microsoft Graph Only
 .DESCRIPTION
-    Enterprise-grade audit solution for external users across SharePoint Online, Microsoft Teams, and Microsoft 365 Groups
+    Streamlined audit solution for external users using Microsoft Graph API exclusively
 .AUTHOR
     Microsoft 365 Security SME
 .VERSION
-    2.1.0
+    3.0.0
 .NOTES
-    Implements zero-trust security model with comprehensive error handling and compliance reporting
-    Fixed module compatibility issues and added robust error handling
+    Pure Microsoft Graph implementation with simplified authentication and comprehensive reporting
 #>
 
 [CmdletBinding()]
@@ -23,16 +22,7 @@ param (
     [string]$OutputPath = ".\AuditReports",
     
     [Parameter(Mandatory = $false)]
-    [switch]$IncludeFileAnalysis,
-    
-    [Parameter(Mandatory = $false)]
-    [switch]$DetailedPermissions,
-    
-    [Parameter(Mandatory = $false)]
     [int]$DaysToAudit = 90,
-    
-    [Parameter(Mandatory = $false)]
-    [string[]]$SpecificSites = @(),
     
     [Parameter(Mandatory = $false)]
     [switch]$ExportIndividualReports
@@ -55,11 +45,7 @@ $Global:AuditConfig = @{
         "Directory.Read.All"
         "AuditLog.Read.All"
         "Reports.Read.All"
-    )
-    SPOScopes = @(
-        "Sites.FullControl.All"
-        "User.Read.All"
-        "Group.ReadWrite.All"
+        "GroupMember.Read.All"
     )
 }
 
@@ -68,12 +54,13 @@ function Install-RequiredModules {
     [CmdletBinding()]
     param()
     
-    Write-Host "🔧 Checking and installing required PowerShell modules..." -ForegroundColor Cyan
+    Write-Host "🔧 Checking and installing Microsoft Graph module..." -ForegroundColor Cyan
     
     # Remove all potentially conflicting modules first
     $conflictingModules = @(
         "Microsoft.Graph*",
         "ExchangeOnlineManagement",
+        "PnP.PowerShell",
         "AzureAD*",
         "MSOnline"
     )
@@ -85,98 +72,58 @@ function Install-RequiredModules {
         }
     }
     
-    $requiredModules = @(
-        @{ Name = "Microsoft.Graph"; ExactVersion = "1.28.0" },
-        @{ Name = "PnP.PowerShell"; MinVersion = "1.12.0" },
-        @{ Name = "ExchangeOnlineManagement"; ExactVersion = "2.0.5" }
-    )
+    # Only Microsoft Graph module is required
+    $requiredModule = @{ Name = "Microsoft.Graph"; ExactVersion = "1.28.0" }
     
-    foreach ($moduleInfo in $requiredModules) {
-        Write-Host "Checking module: $($moduleInfo.Name)..." -ForegroundColor Cyan
-        
-        $installedModule = $null
-        if ($moduleInfo.ExactVersion) {
-            $installedModule = Get-Module -Name $moduleInfo.Name -ListAvailable | 
-                Where-Object { $_.Version -eq [Version]$moduleInfo.ExactVersion } | 
-                Select-Object -First 1
-        } else {
-            $installedModule = Get-Module -Name $moduleInfo.Name -ListAvailable | 
-                Where-Object { $_.Version -ge [Version]$moduleInfo.MinVersion } | 
-                Sort-Object Version -Descending | 
-                Select-Object -First 1
-        }
-        
-        if (-not $installedModule) {
-            Write-Host "Installing $($moduleInfo.Name)..." -ForegroundColor Yellow
-            try {
-                $installParams = @{
-                    Name = $moduleInfo.Name
-                    Scope = "CurrentUser"
-                    Force = $true
-                    AllowClobber = $true
-                }
-                
-                if ($moduleInfo.ExactVersion) {
-                    $installParams.RequiredVersion = $moduleInfo.ExactVersion
-                } else {
-                    $installParams.MinimumVersion = $moduleInfo.MinVersion
-                }
-                
-                Install-Module @installParams
-                Write-Host "✅ $($moduleInfo.Name) installed successfully" -ForegroundColor Green
+    Write-Host "Checking module: $($requiredModule.Name)..." -ForegroundColor Cyan
+    
+    $installedModule = Get-Module -Name $requiredModule.Name -ListAvailable | 
+        Where-Object { $_.Version -eq [Version]$requiredModule.ExactVersion } | 
+        Select-Object -First 1
+    
+    if (-not $installedModule) {
+        Write-Host "Installing $($requiredModule.Name)..." -ForegroundColor Yellow
+        try {
+            $installParams = @{
+                Name = $requiredModule.Name
+                RequiredVersion = $requiredModule.ExactVersion
+                Scope = "CurrentUser"
+                Force = $true
+                AllowClobber = $true
             }
-            catch {
-                Write-Host "❌ Failed to install $($moduleInfo.Name): $($_.Exception.Message)" -ForegroundColor Red
-                if ($moduleInfo.Name -in @("Microsoft.Graph", "PnP.PowerShell")) {
-                    Write-Host "Warning: This module is important for full functionality" -ForegroundColor Yellow
-                }
-            }
+            
+            Install-Module @installParams
+            Write-Host "✅ $($requiredModule.Name) installed successfully" -ForegroundColor Green
         }
-        else {
-            Write-Host "✅ $($moduleInfo.Name) version $($installedModule.Version) is available" -ForegroundColor Green
+        catch {
+            Write-Host "❌ Failed to install $($requiredModule.Name): $($_.Exception.Message)" -ForegroundColor Red
+            throw "Microsoft Graph module is required for this audit script"
         }
     }
+    else {
+        Write-Host "✅ $($requiredModule.Name) version $($installedModule.Version) is available" -ForegroundColor Green
+    }
     
-    # Import modules with error handling
+    # Import Microsoft Graph module
     try {
-        Write-Host "Importing modules with specific versions..." -ForegroundColor Cyan
+        Write-Host "Importing Microsoft Graph module..." -ForegroundColor Cyan
         
-        # Import Microsoft Graph with exact version
-        $graphModule = Get-Module -Name "Microsoft.Graph" -ListAvailable | Where-Object { $_.Version -eq "1.28.0" } | Select-Object -First 1
+        $graphModule = Get-Module -Name "Microsoft.Graph" -ListAvailable | 
+            Where-Object { $_.Version -eq "1.28.0" } | 
+            Select-Object -First 1
+        
         if ($graphModule) {
             Import-Module -Name $graphModule.Path -Force -Global
             Write-Host "✅ Microsoft Graph 1.28.0 imported successfully" -ForegroundColor Green
         }
-        
-        # Import PnP PowerShell
-        Import-Module -Name "PnP.PowerShell" -Force -ErrorAction SilentlyContinue
-        
-        # Import Exchange Online Management with specific version
-        $exoModule = Get-Module -Name "ExchangeOnlineManagement" -ListAvailable | Where-Object { $_.Version -eq "2.0.5" } | Select-Object -First 1
-        if ($exoModule) {
-            Import-Module -Name $exoModule.Path -Force -Global
-            Write-Host "✅ ExchangeOnlineManagement 2.0.5 imported successfully" -ForegroundColor Green
+        else {
+            throw "Microsoft Graph module version 1.28.0 not found"
         }
     }
     catch {
-        Write-Host "Warning: Some modules failed to import: $($_.Exception.Message)" -ForegroundColor Yellow
-        Write-Host "Continuing with available modules..." -ForegroundColor Yellow
+        Write-Host "❌ Failed to import Microsoft Graph module: $($_.Exception.Message)" -ForegroundColor Red
+        throw
     }
-}
-
-# Simple logging matching original script pattern
-
-# Exchange Online troubleshooting function
-function Show-ExchangeOnlineTroubleshooting {
-    Write-Host "`n🔧 Exchange Online Connection Troubleshooting Tips:" -ForegroundColor Cyan
-    Write-Host "If Exchange Online connection continues to fail, try these steps:" -ForegroundColor White
-    Write-Host "1. Restart PowerShell as Administrator" -ForegroundColor Yellow
-    Write-Host "2. Check Windows Remote Management service: Get-Service WinRM" -ForegroundColor Yellow
-    Write-Host "3. Update Exchange Online Management module: Update-Module ExchangeOnlineManagement" -ForegroundColor Yellow
-    Write-Host "4. Clear PowerShell credentials: Remove-Item -Path 'HKCU:\Software\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell' -Recurse -ErrorAction SilentlyContinue" -ForegroundColor Yellow
-    Write-Host "5. Try connecting from a different network" -ForegroundColor Yellow
-    Write-Host "6. Check Microsoft 365 service health at https://admin.microsoft.com/servicehealth" -ForegroundColor Yellow
-    Write-Host "`nThe audit will continue with Microsoft Graph and SharePoint data.`n" -ForegroundColor Green
 }
 
 #endregion
@@ -188,15 +135,49 @@ function Connect-M365Services {
     param()
     
     try {
-        Write-Host "🔐 Initiating Microsoft 365 authentication sequence..." -ForegroundColor $(if("Info" -eq "Info"){"Cyan"}elseif("Info" -eq "Success"){"Green"}elseif("Info" -eq "Warning"){"Yellow"}elseif("Info" -eq "Error"){"Red"}else{"White"})
+        Write-Host "🔐 Connecting to Microsoft Graph..." -ForegroundColor Cyan
         
-        # Connect to Microsoft Graph with fallback methods
-        Write-Host "Connecting to Microsoft Graph..." -ForegroundColor $(if("Info" -eq "Info"){"Cyan"}elseif("Info" -eq "Success"){"Green"}elseif("Info" -eq "Warning"){"Yellow"}elseif("Info" -eq "Error"){"Red"}else{"White"})
-        
-        # Build connection parameters for v1.28.0 compatibility (no NoWelcome parameter)
+        # Build connection parameters for v1.28.0 compatibility
         $graphParams = @{
             Scopes = $Global:AuditConfig.GraphScopes
         }
+        
+        if ($TenantId) {
+            $graphParams.Add("TenantId", $TenantId)
+        }
+        
+        try {
+            # Try standard interactive authentication first
+            Connect-MgGraph @graphParams -ErrorAction Stop
+            
+            # Wait a moment for the connection to stabilize
+            Start-Sleep -Seconds 2
+            
+            $context = Get-MgContext -ErrorAction Stop
+            Write-Host "✅ Connected to Microsoft Graph as: $($context.Account)" -ForegroundColor Green
+            Write-Host "✅ Tenant: $($context.TenantId)" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "Standard authentication failed, trying device code..." -ForegroundColor Yellow
+            try {
+                # Fallback to device code authentication
+                Connect-MgGraph -Scopes $Global:AuditConfig.GraphScopes -UseDeviceAuthentication -ErrorAction Stop
+                $context = Get-MgContext -ErrorAction Stop
+                Write-Host "✅ Connected to Microsoft Graph as: $($context.Account)" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "Failed to connect to Microsoft Graph: $($_.Exception.Message)" -ForegroundColor Red
+                throw
+            }
+        }
+        
+        return $true
+    }
+    catch {
+        Write-Host "Failed to authenticate to Microsoft Graph" -ForegroundColor Red -ErrorRecord $_
+        throw
+    }
+}
         
         if ($TenantId) {
             $graphParams.Add("TenantId", $TenantId)

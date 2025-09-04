@@ -1,0 +1,3 @@
+"UserEmail","DisplayName","CreatedDate","LastSignIn","AccountEnabled","ExternalUserState","StateChangeDate","DaysSinceCreation","DaysSinceLastSignIn","ExpirationStatus","RecommendedAction"
+"alpesh.nakar@seers.net.au","Alpesh Nakar","1/1/1900 12:00:00 AM",,"False","Unknown",,"45902","Never signed in","Disabled","Account disabled - review for removal"
+,"Alpesh Nakar","9/2/2025 2:00:42 AM",,"True","alpesh.nakar@seers.net.au",,"2","Never signed in","Inactive","Consider removing - inactive for over 90 days"
