@@ -27,6 +27,12 @@ Make sure the app registration used for certificate based authentication is gran
 for "Files.Read.All" and "Sites.Read.All" to ensure it can retrieve the required details. Else, you will get the
 following error:"Get-PnPFileSharingLink: Either scp or roles claim need to be present in the token."
 
+~~~~~~~~~~~
+Change Log:
+~~~~~~~~~~~
+V1.0 (Apr 25, 2025) – File created.  
+V1.1 (Sep 09, 2025) – Added the function call to install PnP PowerShell module.
+
 
 For detailed script execution: https://o365reports.com/2025/04/22/get-all-anonymous-links-in-sharepoint-online-using-powershell
 
@@ -63,7 +69,7 @@ Function Installation-Module
  } 
  Else
  { 
-  Write-Host PnP PowerShell module is required to connect SharePoint Online.Please install module using Install-Module PnP.PowerShell cmdlet. 
+  Write-Host "PnP PowerShell module is required to connect SharePoint Online.Please install module using 'Install-Module PnP.PowerShell' cmdlet." 
   Exit
  }
 }
@@ -217,10 +223,12 @@ Function Get-SharedLinks
  }
 }
 
-
 $TimeStamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $ReportOutput = "$PSScriptRoot\AnonymousLink_Report_ $TimeStamp.csv"
 $Global:ItemCount = 0
+
+Installation-Module
+
 If($ClientId -eq "")
 {
  $ClientId= Read-Host "ClientId is required to connect PnP PowerShell. Enter ClientId"
@@ -266,8 +274,8 @@ Else
  Disconnect-PnPOnline -WarningAction SilentlyContinue
 }
  Write-Progress -Completed
- Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
- Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+ Write-Host "`n~~ Script prepared by AdminDroid Community ~~`n" -ForegroundColor Green
+ Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to access 3,000+ reports and 450+ management actions across your Microsoft 365 environment. ~~" -ForegroundColor Green `n`n
  
 if((Test-Path -Path $ReportOutput) -eq "True") 
 {
