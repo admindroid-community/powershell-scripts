@@ -1,0 +1,27 @@
+[2025-09-09 12:40:53] [INFO] Starting SharePoint Online Tenant Rename Script
+[2025-09-09 12:40:54] [INFO] Current Tenant: n4k4r.sharepoint.com
+[2025-09-09 12:40:54] [INFO] New Tenant: educ4teaustralia.sharepoint.com
+[2025-09-09 12:40:54] [INFO] Scheduled Delay: 25 hours
+[2025-09-09 12:40:54] [INFO] Checking required PowerShell modules...
+[2025-09-09 12:40:54] [WARNING] PowerShell version 5.1.26100.5074 detected. PnP.PowerShell requires PowerShell 7.4+. Using SPO module only.
+[2025-09-09 12:40:54] [INFO] Microsoft.Online.SharePoint.PowerShell module is available
+[2025-09-09 12:40:54] [INFO] Microsoft.Online.SharePoint.PowerShell module imported successfully
+[2025-09-09 12:40:54] [INFO] Connecting to SharePoint Online...
+[2025-09-09 12:40:54] [INFO] Using interactive authentication
+[2025-09-09 12:41:01] [INFO] Successfully connected to SharePoint Online
+[2025-09-09 12:41:01] [INFO] Checking tenant rename eligibility...
+[2025-09-09 12:41:02] [INFO] Current SharePoint URL: 
+[2025-09-09 12:41:02] [WARNING] Current tenant name validation failed. Expected: n4k4r
+[2025-09-09 12:41:02] [INFO] Actual tenant URL: 
+[2025-09-09 12:41:02] [ERROR] Failed to check tenant eligibility: The term 'Get-SPOOperation' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+[2025-09-09 12:41:02] [ERROR] Script execution failed: Tenant is not eligible for rename operation
+[2025-09-09 12:41:03] [INFO] Disconnecting from SharePoint Online services...
+[2025-09-09 12:41:03] [INFO] Successfully disconnected from all services
+[2025-09-09 12:41:03] [INFO] === TENANT RENAME SUMMARY ===
+[2025-09-09 12:41:03] [INFO] Start Time: 09/09/2025 12:40:53
+[2025-09-09 12:41:03] [INFO] End Time: 09/09/2025 12:41:03
+[2025-09-09 12:41:03] [INFO] Duration: 00:00:09.8865031
+[2025-09-09 12:41:03] [INFO] Errors: 3
+[2025-09-09 12:41:03] [INFO] Warnings: 2
+[2025-09-09 12:41:03] [INFO] Log File: SPOTenantRename_2025-Sep-09-Tue_12-40-53_PM.log
+[2025-09-09 12:41:04] [WARNING] Tenant rename process completed with errors. Check log file for details.

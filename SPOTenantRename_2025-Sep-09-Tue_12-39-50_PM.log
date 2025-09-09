@@ -1,0 +1,24 @@
+[2025-09-09 12:39:50] [INFO] Starting SharePoint Online Tenant Rename Script
+[2025-09-09 12:39:50] [INFO] Current Tenant: n4k4r.sharepoint.com
+[2025-09-09 12:39:50] [INFO] New Tenant: educ4teaustralia.sharepoint.com
+[2025-09-09 12:39:50] [INFO] Scheduled Delay: 25 hours
+[2025-09-09 12:39:50] [INFO] Checking required PowerShell modules...
+[2025-09-09 12:39:50] [WARNING] PowerShell version 5.1.26100.5074 detected. PnP.PowerShell requires PowerShell 7.4+. Using SPO module only.
+[2025-09-09 12:39:51] [INFO] Microsoft.Online.SharePoint.PowerShell module is available
+[2025-09-09 12:39:51] [INFO] Microsoft.Online.SharePoint.PowerShell module imported successfully
+[2025-09-09 12:39:51] [INFO] Connecting to SharePoint Online...
+[2025-09-09 12:39:51] [INFO] Using interactive authentication
+[2025-09-09 12:40:25] [INFO] Successfully connected to SharePoint Online
+[2025-09-09 12:40:25] [INFO] Checking tenant rename eligibility...
+[2025-09-09 12:40:26] [ERROR] Current tenant name validation failed. Expected: n4k4r
+[2025-09-09 12:40:26] [ERROR] Script execution failed: Tenant is not eligible for rename operation
+[2025-09-09 12:40:26] [INFO] Disconnecting from SharePoint Online services...
+[2025-09-09 12:40:27] [INFO] Successfully disconnected from all services
+[2025-09-09 12:40:27] [INFO] === TENANT RENAME SUMMARY ===
+[2025-09-09 12:40:27] [INFO] Start Time: 09/09/2025 12:39:50
+[2025-09-09 12:40:27] [INFO] End Time: 09/09/2025 12:40:27
+[2025-09-09 12:40:27] [INFO] Duration: 00:00:36.8289710
+[2025-09-09 12:40:27] [INFO] Errors: 3
+[2025-09-09 12:40:27] [INFO] Warnings: 1
+[2025-09-09 12:40:27] [INFO] Log File: SPOTenantRename_2025-Sep-09-Tue_12-39-50_PM.log
+[2025-09-09 12:40:27] [WARNING] Tenant rename process completed with errors. Check log file for details.

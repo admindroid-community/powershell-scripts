@@ -170,10 +170,17 @@ function Test-TenantRenameEligibility {
         # Check current tenant properties
         $tenant = Get-SPOTenant
         
-        # Validate current domain
+        # Validate current domain and provide helpful information
+        Write-Log "Current SharePoint URL: $($tenant.SharePointUrl)" -Color Cyan
         if ($tenant.SharePointUrl -notlike "*$CurrentTenantName.sharepoint.com*") {
-            Write-Log "Current tenant name validation failed. Expected: $CurrentTenantName" -Level "ERROR" -Color Red
-            return $false
+            Write-Log "Current tenant name validation failed. Expected: $CurrentTenantName" -Level "WARNING" -Color Yellow
+            Write-Log "Actual tenant URL: $($tenant.SharePointUrl)" -Color Yellow
+            if (-not $Force) {
+                $continue = Read-Host "Continue with validation anyway? [Y] Yes [N] No"
+                if ($continue -notmatch "[yY]") {
+                    return $false
+                }
+            }
         }
         
         # Check for active operations
