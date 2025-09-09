@@ -1,0 +1,25 @@
+[2025-09-09 12:29:02] [INFO] Starting SharePoint Online Tenant Rename Script
+[2025-09-09 12:29:02] [INFO] Current Tenant: n4k4r.sharepoint.com
+[2025-09-09 12:29:02] [INFO] New Tenant: educ4teaustralia.sharepoint.com
+[2025-09-09 12:29:02] [INFO] Scheduled Delay: 25 hours
+[2025-09-09 12:29:02] [INFO] Checking required PowerShell modules...
+[2025-09-09 12:29:03] [INFO] Microsoft.Online.SharePoint.PowerShell module is available
+[2025-09-09 12:29:03] [INFO] Microsoft.Online.SharePoint.PowerShell module imported successfully
+[2025-09-09 12:29:03] [WARNING] PnP.PowerShell is not available
+[2025-09-09 12:29:03] [INFO] Installing PnP.PowerShell module...
+[2025-09-09 12:29:37] [INFO] PnP.PowerShell module installed successfully
+[2025-09-09 12:29:37] [INFO] PnP.PowerShell module imported successfully
+[2025-09-09 12:29:37] [INFO] Connecting to SharePoint Online...
+[2025-09-09 12:29:37] [INFO] Using interactive authentication
+[2025-09-09 12:38:21] [ERROR] Failed to connect to SharePoint Online: The term 'Connect-PnPOnline' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is correct and try again.
+[2025-09-09 12:38:21] [ERROR] Script execution failed: Failed to connect to SharePoint Online
+[2025-09-09 12:38:21] [INFO] Disconnecting from SharePoint Online services...
+[2025-09-09 12:38:21] [INFO] Successfully disconnected from all services
+[2025-09-09 12:38:21] [INFO] === TENANT RENAME SUMMARY ===
+[2025-09-09 12:38:21] [INFO] Start Time: 09/09/2025 12:29:02
+[2025-09-09 12:38:21] [INFO] End Time: 09/09/2025 12:38:21
+[2025-09-09 12:38:21] [INFO] Duration: 00:09:19.0939503
+[2025-09-09 12:38:21] [INFO] Errors: 3
+[2025-09-09 12:38:21] [INFO] Warnings: 1
+[2025-09-09 12:38:21] [INFO] Log File: SPOTenantRename_2025-Sep-09-Tue_12-29-02_PM.log
+[2025-09-09 12:38:21] [WARNING] Tenant rename process completed with errors. Check log file for details.
