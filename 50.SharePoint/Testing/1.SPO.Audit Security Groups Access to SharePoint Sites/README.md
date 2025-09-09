@@ -11,8 +11,6 @@ The script exports an output CSV file with the following information:
 - Permission Type (Direct or Inherited)
 - Creation Date of the audit
 
-![Security Group SharePoint Access Report](https://educ4te.com/sharepoint-permissions-audit.png)
-
 ## Script Highlights
 
 - ✅ **Modern Authentication**: Supports certificate-based authentication (CBA) and MFA-enabled accounts

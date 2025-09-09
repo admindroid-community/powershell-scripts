@@ -375,5 +375,5 @@ try {
     Disconnect-Services
     
     # Display script information
-    Write-Host "`n~~ Script by educ4te.com ~~" -ForegroundColor Green
+    Write-Host "`n~~ Scripted by educ4te.com ~~" -ForegroundColor Green
 }
