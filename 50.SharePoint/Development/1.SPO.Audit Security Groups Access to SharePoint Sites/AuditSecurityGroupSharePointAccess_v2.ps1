@@ -616,6 +616,6 @@ try {
     Disconnect-Services
     
     # Display script information
-    Write-Host "`n~~ Enhanced Security Group Audit Tool v2.0 by educ4te.com ~~" -ForegroundColor Green
-    Write-Host "   For more advanced M365 reporting tools, visit AdminDroid.com" -ForegroundColor Green
+    Write-Host "`n~~ Enhanced Security Group Audit Tool v2.0 by educ4te ~~" -ForegroundColor Green
+    Write-Host "   For more advanced cybersecurity solutions, visit educ4te.com" -ForegroundColor Green
 }
