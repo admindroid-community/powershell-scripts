@@ -20,7 +20,7 @@ param(
     [string]$CertificateThumbprint, 
     [string]$TenantId,
     [string]$UserName,
-    [string]$Password,
+    [SecureString]$Password,
     [Parameter(Mandatory = $true)]
     [string]$TenantUrl,
     [Parameter(Mandatory = $false)]
@@ -44,10 +44,18 @@ $Global:ProvisioningConfig = @{
     CreatedSites = @()
     CreatedDocuments = @()
     StartTime = Get-Date
-}
-
-# Document templates
-$WordTemplate = @"
+    # Store authentication parameters for use in sub-functions
+    ClientId = $ClientId
+    CertificateThumbprint = $CertificateThumbprint
+    TenantId = $TenantId
+    UserName = $UserName
+    Password = $Password
+    # Store document counts for use in functions
+    WordDocCount = $WordDocCount
+    ExcelSheetCount = $ExcelSheetCount
+    PdfFileCount = $PdfFileCount
+    # Store document templates
+    WordTemplate = @"
 <!DOCTYPE html>
 <html>
 <head>
@@ -63,8 +71,7 @@ $WordTemplate = @"
 </body>
 </html>
 "@
-
-$ExcelTemplate = @"
+    ExcelTemplate = @"
 Name,Department,Salary,Start Date
 John Smith,IT,75000,2023-01-15
 Jane Doe,HR,65000,2023-02-20
@@ -77,6 +84,46 @@ Emily Taylor,Marketing,73000,2023-08-30
 Chris Martin,IT,77000,2023-09-14
 Ashley Garcia,HR,66000,2023-10-25
 "@
+}
+
+# Function to validate required parameters
+function Test-RequiredParameters {
+    if (-not $TenantUrl) {
+        Write-Host "Error: TenantUrl parameter is required" -ForegroundColor Red
+        return $false
+    }
+    
+    if ($TenantUrl -notmatch "^https://.*\.sharepoint\.com$") {
+        Write-Host "Warning: TenantUrl should be in format: https://tenant.sharepoint.com" -ForegroundColor Yellow
+    }
+    
+    # Validate authentication parameters
+    $hasAuth = $false
+    if ($ClientId -and $CertificateThumbprint -and $TenantId) {
+        $hasAuth = $true
+        Write-Host "Certificate-based authentication will be used" -ForegroundColor Green
+    } elseif ($UserName -and $Password) {
+        $hasAuth = $true
+        Write-Host "Basic authentication will be used" -ForegroundColor Yellow
+    } else {
+        $hasAuth = $true
+        Write-Host "Interactive authentication will be used" -ForegroundColor Green
+    }
+    
+    # Validate site collection prefix length
+    if ($SiteCollectionPrefix.Length -gt 20) {
+        Write-Host "Warning: SiteCollectionPrefix is longer than recommended (20 characters)" -ForegroundColor Yellow
+    }
+    
+    # Validate document counts are reasonable
+    $totalDocuments = ($WordDocCount + $ExcelSheetCount + $PdfFileCount) * $SiteCollectionCount * ($SitesPerCollection + 1)
+    if ($totalDocuments -gt 10000) {
+        Write-Host "Warning: Total documents to create ($totalDocuments) is very large. This may take a long time." -ForegroundColor Yellow
+        Write-Host "Consider reducing document counts or site numbers." -ForegroundColor Yellow
+    }
+    
+    return $hasAuth
+}
 
 # Function to check and install required modules
 function Install-RequiredModules {
@@ -97,6 +144,35 @@ function Install-RequiredModules {
     }
 }
 
+# Function to establish SharePoint connection (reusable)
+function Connect-SharePointOnlineWithAuth {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Url
+    )
+    
+    try {
+        if ($Global:ProvisioningConfig.ClientId -and $Global:ProvisioningConfig.CertificateThumbprint -and $Global:ProvisioningConfig.TenantId) {
+            Write-Host "Using certificate-based authentication for $Url" -ForegroundColor Green
+            Connect-PnPOnline -Url $Url -ClientId $Global:ProvisioningConfig.ClientId -Thumbprint $Global:ProvisioningConfig.CertificateThumbprint -Tenant $Global:ProvisioningConfig.TenantId
+        } elseif ($Global:ProvisioningConfig.UserName -and $Global:ProvisioningConfig.Password) {
+            Write-Host "Using credential-based authentication for $Url" -ForegroundColor Yellow
+            $Credential = New-Object System.Management.Automation.PSCredential($Global:ProvisioningConfig.UserName, $Global:ProvisioningConfig.Password)
+            Connect-PnPOnline -Url $Url -Credentials $Credential
+        } else {
+            Write-Host "Using interactive authentication for $Url" -ForegroundColor Green
+            # Use default Client ID for PnP PowerShell if none provided
+            $clientIdToUse = if ($Global:ProvisioningConfig.ClientId) { $Global:ProvisioningConfig.ClientId } else { "afe1b358-534b-4c96-abb9-ecea5d5f2e5d" }
+            Connect-PnPOnline -Url $Url -Interactive -ClientId $clientIdToUse -WarningAction SilentlyContinue
+        }
+        return $true
+    }
+    catch {
+        Write-Host "Failed to connect to $Url`: $($_.Exception.Message)" -ForegroundColor Red
+        return $false
+    }
+}
+
 # Function to establish SharePoint connection
 function Connect-SharePointOnline {
     try {
@@ -107,12 +183,13 @@ function Connect-SharePointOnline {
             Connect-PnPOnline -Url $TenantUrl -ClientId $ClientId -Thumbprint $CertificateThumbprint -Tenant $TenantId
         } elseif ($UserName -and $Password) {
             Write-Host "Using basic authentication" -ForegroundColor Yellow
-            $SecurePassword = ConvertTo-SecureString $Password -AsPlainText -Force
-            $Credential = New-Object System.Management.Automation.PSCredential($UserName, $SecurePassword)
+            $Credential = New-Object System.Management.Automation.PSCredential($UserName, $Password)
             Connect-PnPOnline -Url $TenantUrl -Credentials $Credential
         } else {
             Write-Host "Using interactive authentication" -ForegroundColor Green
-            Connect-PnPOnline -Url $TenantUrl -Interactive
+            # Use default Client ID for PnP PowerShell if none provided
+            $clientIdToUse = if ($ClientId) { $ClientId } else { "afe1b358-534b-4c96-abb9-ecea5d5f2e5d" }
+            Connect-PnPOnline -Url $TenantUrl -Interactive -ClientId $clientIdToUse -WarningAction SilentlyContinue
         }
         
         Write-Host "Successfully connected to SharePoint Online" -ForegroundColor Green
@@ -136,7 +213,14 @@ function New-SiteCollection {
     try {
         Write-Host "Creating site collection: $Title" -ForegroundColor Cyan
         
-        New-PnPSite -Type TeamSite -Title $Title -Url $SiteUrl -Owner $Owner -Wait
+        # Extract the alias from the URL (last part after /sites/)
+        if ($SiteUrl -match "/sites/([^/]+)$") {
+            $alias = $Matches[1]
+            # Use TeamSiteWithoutMicrosoft365Group for more control
+            New-PnPSite -Type TeamSiteWithoutMicrosoft365Group -Title $Title -Url $SiteUrl -Wait
+        } else {
+            throw "Invalid site URL format. Expected format: https://tenant.sharepoint.com/sites/sitename"
+        }
         
         $Global:ProvisioningConfig.CreatedSites += @{
             Type = "SiteCollection"
@@ -164,7 +248,9 @@ function New-SubSite {
     )
     
     try {
-        Connect-PnPOnline -Url $ParentUrl -Interactive
+        if (-not (Connect-SharePointOnlineWithAuth -Url $ParentUrl)) {
+            throw "Failed to connect to parent site: $ParentUrl"
+        }
         
         New-PnPWeb -Title $Title -Url $SiteUrl -Template "STS#3"
         
@@ -192,15 +278,17 @@ function New-DocumentsInSite {
     )
     
     try {
-        Connect-PnPOnline -Url $SiteUrl -Interactive
+        if (-not (Connect-SharePointOnlineWithAuth -Url $SiteUrl)) {
+            throw "Failed to connect to site: $SiteUrl"
+        }
         
         # Create Word documents
-        for ($i = 1; $i -le $WordDocCount; $i++) {
+        for ($i = 1; $i -le $Global:ProvisioningConfig.WordDocCount; $i++) {
             $fileName = "Document_$i.docx"
             $tempFile = [System.IO.Path]::GetTempFileName() + ".html"
-            $WordTemplate | Out-File -FilePath $tempFile -Encoding UTF8
+            $Global:ProvisioningConfig.WordTemplate | Out-File -FilePath $tempFile -Encoding UTF8
             
-            Add-PnPFile -Path $tempFile -Folder "Shared Documents" -NewFileName $fileName
+            Add-PnPFile -Path $tempFile -Folder "Shared Documents" -NewFileName $fileName | Out-Null
             Remove-Item $tempFile -Force
             
             $Global:ProvisioningConfig.CreatedDocuments += @{
@@ -212,12 +300,12 @@ function New-DocumentsInSite {
         }
         
         # Create Excel files
-        for ($i = 1; $i -le $ExcelSheetCount; $i++) {
+        for ($i = 1; $i -le $Global:ProvisioningConfig.ExcelSheetCount; $i++) {
             $fileName = "Spreadsheet_$i.xlsx"
             $tempFile = [System.IO.Path]::GetTempFileName() + ".csv"
-            $ExcelTemplate | Out-File -FilePath $tempFile -Encoding UTF8
+            $Global:ProvisioningConfig.ExcelTemplate | Out-File -FilePath $tempFile -Encoding UTF8
             
-            Add-PnPFile -Path $tempFile -Folder "Shared Documents" -NewFileName $fileName
+            Add-PnPFile -Path $tempFile -Folder "Shared Documents" -NewFileName $fileName | Out-Null
             Remove-Item $tempFile -Force
             
             $Global:ProvisioningConfig.CreatedDocuments += @{
@@ -229,13 +317,13 @@ function New-DocumentsInSite {
         }
         
         # Create PDF files (as text files with PDF extension for simulation)
-        for ($i = 1; $i -le $PdfFileCount; $i++) {
+        for ($i = 1; $i -le $Global:ProvisioningConfig.PdfFileCount; $i++) {
             $fileName = "Document_$i.pdf"
             $pdfContent = "PDF Content for $fileName`nCreated: $(Get-Date)`nThis is sample PDF content for testing purposes."
             $tempFile = [System.IO.Path]::GetTempFileName() + ".txt"
             $pdfContent | Out-File -FilePath $tempFile -Encoding UTF8
             
-            Add-PnPFile -Path $tempFile -Folder "Shared Documents" -NewFileName $fileName
+            Add-PnPFile -Path $tempFile -Folder "Shared Documents" -NewFileName $fileName | Out-Null
             Remove-Item $tempFile -Force
             
             $Global:ProvisioningConfig.CreatedDocuments += @{
@@ -294,6 +382,11 @@ try {
     Write-Host "Site Collections to create: $SiteCollectionCount" -ForegroundColor Yellow
     Write-Host "Sites per collection: $SitesPerCollection" -ForegroundColor Yellow
     
+    # Validate required parameters
+    if (-not (Test-RequiredParameters)) {
+        throw "Parameter validation failed"
+    }
+    
     # Install required modules
     Install-RequiredModules
     
@@ -303,9 +396,30 @@ try {
     }
     
     # Get current user for site ownership
-    $currentUser = (Get-PnPContext).Web.CurrentUser.Email
+    $currentUser = $null
+    try {
+        $currentUser = (Get-PnPContext).Web.CurrentUser.Email
+    }
+    catch {
+        Write-Host "Could not retrieve current user from context" -ForegroundColor Yellow
+    }
+    
     if (-not $currentUser) {
         $currentUser = $UserName
+    }
+    
+    # Final fallback if no user is available
+    if (-not $currentUser) {
+        Write-Host "Warning: No user specified for site ownership." -ForegroundColor Yellow
+        # Try to extract admin from tenant URL
+        if ($TenantUrl -match "https://(.+)\.sharepoint\.com") {
+            $tenantName = $Matches[1]
+            $currentUser = "admin@$tenantName.onmicrosoft.com"
+            Write-Host "Using inferred admin: $currentUser" -ForegroundColor Yellow
+        } else {
+            Write-Host "Error: Could not determine site owner. Please provide UserName parameter." -ForegroundColor Red
+            throw "Site owner determination failed"
+        }
     }
     
     $totalOperations = $SiteCollectionCount * (1 + $SitesPerCollection)
