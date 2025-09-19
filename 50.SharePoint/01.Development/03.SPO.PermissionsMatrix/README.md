@@ -48,15 +48,22 @@ The **SharePoint Online Permissions Matrix Audit** script provides comprehensive
 ## Prerequisites
 
 ### Required PowerShell Modules
-- **PnP.PowerShell** (>= 1.12.0)
-- **Microsoft.Online.SharePoint.PowerShell** (>= 16.0.0)
+- **PnP.PowerShell** (>= 1.12.0) - Primary SharePoint Online operations
+- **Microsoft.Online.SharePoint.PowerShell** (>= 16.0.0) - SharePoint Online Management Shell
+- **MSOnline** (>= 1.0.0) - Optional, for additional authentication scenarios
 
 ### Installation
 ```powershell
 # Install required modules
 Install-Module -Name PnP.PowerShell -Force -Scope CurrentUser
 Install-Module -Name Microsoft.Online.SharePoint.PowerShell -Force -Scope CurrentUser
+
+# Optional: Install MSOnline for additional authentication options
+Install-Module -Name MSOnline -Force -Scope CurrentUser
 ```
+
+### Module Import
+The script automatically checks for and imports required modules. If modules are missing, you'll see clear installation instructions.
 
 ### Permissions Required
 - **SharePoint Administrator** or **Global Administrator** role
@@ -241,6 +248,41 @@ The script includes comprehensive error handling:
 # Run as Administrator if needed
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 Install-Module -Name PnP.PowerShell -Force -AllowClobber
+Install-Module -Name Microsoft.Online.SharePoint.PowerShell -Force -AllowClobber
+
+# If you get conflicts with older modules
+Uninstall-Module -Name SharePointPnPPowerShellOnline -AllVersions -Force
+Install-Module -Name PnP.PowerShell -Force
+```
+
+**Connection Issues - "Connect-SPOService not recognized"**
+```powershell
+# Manually import the module
+Import-Module Microsoft.Online.SharePoint.PowerShell -Force
+
+# Verify the module is loaded
+Get-Module Microsoft.Online.SharePoint.PowerShell
+
+# Check if cmdlet is available
+Get-Command Connect-SPOService
+```
+
+**SharePoint Client Runtime Assembly Error**
+```powershell
+# Error: "Could not load type 'Microsoft.SharePoint.Client.SharePointOnlineCredentials'"
+# Solution 1: Use PnP PowerShell only (recommended)
+.\AuditSPO.PermissionsMatrix.ps1 -TenantName "contoso" -UsePnPOnly -GenerateHtmlReport
+
+# Solution 2: Reinstall SharePoint Online Management Shell
+Uninstall-Module Microsoft.Online.SharePoint.PowerShell -AllVersions
+Install-Module Microsoft.Online.SharePoint.PowerShell -Force
+
+# Solution 3: Clear module cache and reinstall
+Remove-Item $env:USERPROFILE\Documents\PowerShell\Modules\Microsoft.Online.SharePoint.PowerShell -Recurse -Force
+Install-Module Microsoft.Online.SharePoint.PowerShell -Force
+
+# Solution 4: Download MSI installer from Microsoft
+# Visit: https://www.microsoft.com/en-us/download/details.aspx?id=35588
 ```
 
 **Connection Timeouts**

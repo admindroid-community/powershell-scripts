@@ -58,7 +58,10 @@ param(
     [array]$SiteFilter = @(),
     
     [Parameter(Mandatory = $false)]
-    [switch]$VerboseLogging
+    [switch]$VerboseLogging,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$UsePnPOnly
 )
 
 # Initialize global variables
@@ -107,10 +110,12 @@ function Test-RequiredModules {
     
     $requiredModules = @(
         @{Name = "PnP.PowerShell"; MinVersion = "1.12.0"},
-        @{Name = "Microsoft.Online.SharePoint.PowerShell"; MinVersion = "16.0.0"}
+        @{Name = "Microsoft.Online.SharePoint.PowerShell"; MinVersion = "16.0.0"},
+        @{Name = "MSOnline"; MinVersion = "1.0.0"; Optional = $true}
     )
     
     $missingModules = @()
+    $modulesToImport = @()
     
     foreach ($module in $requiredModules) {
         $installedModule = Get-Module -ListAvailable -Name $module.Name | 
@@ -119,11 +124,44 @@ function Test-RequiredModules {
                           Select-Object -First 1
         
         if (-not $installedModule) {
-            $missingModules += $module.Name
-            Write-Host "  ✗ $($module.Name) (>= $($module.MinVersion)) - Missing" -ForegroundColor Red
+            if ($module.Optional) {
+                Write-Host "  ⚠ $($module.Name) (>= $($module.MinVersion)) - Optional, not installed" -ForegroundColor Yellow
+            } else {
+                $missingModules += $module.Name
+                Write-Host "  ✗ $($module.Name) (>= $($module.MinVersion)) - Missing" -ForegroundColor Red
+            }
         } else {
             Write-Host "  ✓ $($module.Name) v$($installedModule.Version) - Available" -ForegroundColor Green
+            $modulesToImport += $module.Name
         }
+    }
+    
+    # Check for SharePoint Client Components
+    Write-Host "`nChecking SharePoint Client Runtime assemblies..." -ForegroundColor Yellow
+    try {
+        $clientRuntimePath = $null
+        $possiblePaths = @(
+            "${env:ProgramFiles}\SharePoint Online Management Shell\Microsoft.Online.SharePoint.PowerShell",
+            "${env:ProgramFiles}\Common Files\Microsoft Shared\Web Server Extensions\16\ISAPI",
+            "${env:ProgramFiles(x86)}\Microsoft SDKs\SharePoint\16.0\Libraries",
+            "${env:ProgramFiles}\Microsoft SDKs\SharePoint\16.0\Libraries"
+        )
+        
+        foreach ($path in $possiblePaths) {
+            if (Test-Path "$path\Microsoft.SharePoint.Client.Runtime.dll") {
+                $clientRuntimePath = "$path\Microsoft.SharePoint.Client.Runtime.dll"
+                Write-Host "  ✓ SharePoint Client Runtime found: $clientRuntimePath" -ForegroundColor Green
+                break
+            }
+        }
+        
+        if (-not $clientRuntimePath) {
+            Write-Host "  ⚠ SharePoint Client Runtime not found in standard locations" -ForegroundColor Yellow
+            Write-Host "    This may cause connection issues with SharePoint Online Management Shell" -ForegroundColor Yellow
+        }
+    }
+    catch {
+        Write-Host "  ⚠ Could not verify SharePoint Client Runtime: $($_.Exception.Message)" -ForegroundColor Yellow
     }
     
     if ($missingModules.Count -gt 0) {
@@ -133,6 +171,20 @@ function Test-RequiredModules {
             Write-Host "  Install-Module -Name $module -Force -Scope CurrentUser" -ForegroundColor Cyan
         }
         throw "Required modules are missing. Please install them and run the script again."
+    }
+    
+    # Import required modules
+    Write-Host "`nImporting modules..." -ForegroundColor Yellow
+    foreach ($moduleName in $modulesToImport) {
+        try {
+            Write-Host "  Importing $moduleName..." -ForegroundColor Cyan
+            Import-Module $moduleName -Force -DisableNameChecking -ErrorAction Stop
+            Write-Host "  ✓ $moduleName imported successfully" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "  ✗ Failed to import $moduleName : $($_.Exception.Message)" -ForegroundColor Red
+            throw "Failed to import required module: $moduleName"
+        }
     }
 }
 
@@ -151,38 +203,123 @@ function Connect-SharePointServices {
     $adminUrl = "https://$TenantName-admin.sharepoint.com"
     $Global:TenantUrl = "https://$TenantName.sharepoint.com"
     
+    # Try PnP PowerShell first (more reliable for modern authentication)
+    Write-Host "Attempting connection using PnP PowerShell..." -ForegroundColor Cyan
     try {
+        if ($ClientId -and $CertificateThumbprint) {
+            # Certificate-based authentication
+            Write-Host "  Using certificate authentication..." -ForegroundColor Gray
+            Connect-PnPOnline -Url $adminUrl -ClientId $ClientId -Thumbprint $CertificateThumbprint -Tenant "$TenantName.onmicrosoft.com"
+            Write-Host "✓ Connected to SharePoint Admin Center using PnP PowerShell (Certificate)" -ForegroundColor Green
+            $Global:UsePnPOnly = $true
+            return $true
+        }
+        elseif ($UserName -and $Password) {
+            # Credential-based authentication
+            Write-Host "  Using credential authentication..." -ForegroundColor Gray
+            $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
+            $credential = New-Object System.Management.Automation.PSCredential($UserName, $securePassword)
+            Connect-PnPOnline -Url $adminUrl -Credentials $credential
+            Write-Host "✓ Connected to SharePoint Admin Center using PnP PowerShell (Credential)" -ForegroundColor Green
+            $Global:UsePnPOnly = $true
+            return $true
+        }
+        else {
+            # Interactive authentication
+            Write-Host "  Using interactive authentication..." -ForegroundColor Gray
+            Connect-PnPOnline -Url $adminUrl -Interactive -WarningAction SilentlyContinue
+            Write-Host "✓ Connected to SharePoint Admin Center using PnP PowerShell (Interactive)" -ForegroundColor Green
+            $Global:UsePnPOnly = $true
+            return $true
+        }
+    }
+    catch {
+        Write-Host "  ⚠ PnP PowerShell connection failed: $($_.Exception.Message)" -ForegroundColor Yellow
+        
+        # If UsePnPOnly is specified, don't try fallback
+        if ($UsePnPOnly) {
+            throw "PnP PowerShell connection failed and -UsePnPOnly parameter specified. Cannot continue."
+        }
+        
+        Write-Host "  Attempting fallback to SharePoint Online Management Shell..." -ForegroundColor Yellow
+    }
+    
+    # Fallback to SharePoint Online Management Shell
+    try {
+        # Verify SharePoint Online Management Shell module is loaded
+        $spoModule = Get-Module -Name "Microsoft.Online.SharePoint.PowerShell" -ErrorAction SilentlyContinue
+        if (-not $spoModule) {
+            Write-Host "  Importing SharePoint Online Management Shell..." -ForegroundColor Cyan
+            Import-Module Microsoft.Online.SharePoint.PowerShell -Force -DisableNameChecking -ErrorAction Stop
+        }
+        
+        # Verify Connect-SPOService cmdlet is available
+        if (-not (Get-Command "Connect-SPOService" -ErrorAction SilentlyContinue)) {
+            throw "Connect-SPOService cmdlet is not available. Please ensure SharePoint Online Management Shell is properly installed."
+        }
+        
         # Connect to SharePoint Online Management Shell
         Write-Host "Connecting to SharePoint Online Management Shell..." -ForegroundColor Cyan
         
         if ($ClientId -and $CertificateThumbprint) {
             # Certificate-based authentication
+            Write-Host "  Using certificate authentication..." -ForegroundColor Gray
             Connect-SPOService -Url $adminUrl -ClientId $ClientId -CertificateThumbprint $CertificateThumbprint
-            Write-Host "✓ Connected using certificate authentication" -ForegroundColor Green
+            Write-Host "✓ Connected using SharePoint Online Management Shell (Certificate)" -ForegroundColor Green
         }
         elseif ($UserName -and $Password) {
             # Credential-based authentication
+            Write-Host "  Using credential authentication..." -ForegroundColor Gray
             $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
             $credential = New-Object System.Management.Automation.PSCredential($UserName, $securePassword)
             Connect-SPOService -Url $adminUrl -Credential $credential
-            Write-Host "✓ Connected using credential authentication" -ForegroundColor Green
+            Write-Host "✓ Connected using SharePoint Online Management Shell (Credential)" -ForegroundColor Green
         }
         else {
             # Interactive authentication
+            Write-Host "  Using interactive authentication..." -ForegroundColor Gray
             Connect-SPOService -Url $adminUrl
-            Write-Host "✓ Connected using interactive authentication" -ForegroundColor Green
+            Write-Host "✓ Connected using SharePoint Online Management Shell (Interactive)" -ForegroundColor Green
         }
         
         # Test connection by getting tenant info
+        Write-Host "  Verifying connection..." -ForegroundColor Gray
         $tenantInfo = Get-SPOTenant -ErrorAction Stop
         Write-Host "✓ SharePoint Online Management Shell connection verified" -ForegroundColor Green
         Write-Host "  Tenant: $($tenantInfo.DisplayName)" -ForegroundColor Gray
+        $Global:UsePnPOnly = $false
         
         return $true
     }
     catch {
-        Add-ErrorLog "Connect-SharePointServices" $_.Exception.Message
-        Write-Host "✗ Failed to connect to SharePoint services: $($_.Exception.Message)" -ForegroundColor Red
+        $errorMessage = $_.Exception.Message
+        Add-ErrorLog "Connect-SharePointServices" $errorMessage
+        Write-Host "✗ Failed to connect to SharePoint services: $errorMessage" -ForegroundColor Red
+        
+        # Provide specific troubleshooting for the assembly load error
+        if ($errorMessage -like "*Could not load type*Microsoft.SharePoint.Client.SharePointOnlineCredentials*") {
+            Write-Host "`nSpecific Error: SharePoint Client Runtime Assembly Issue" -ForegroundColor Red
+            Write-Host "This error occurs when there are version conflicts or missing SharePoint Client Components." -ForegroundColor Yellow
+            Write-Host "`nRecommended Solutions:" -ForegroundColor Yellow
+            Write-Host "  1. Uninstall and reinstall SharePoint Online Management Shell:" -ForegroundColor Cyan
+            Write-Host "     Uninstall-Module Microsoft.Online.SharePoint.PowerShell -AllVersions" -ForegroundColor Gray
+            Write-Host "     Install-Module Microsoft.Online.SharePoint.PowerShell -Force" -ForegroundColor Gray
+            Write-Host "  2. Install SharePoint Online Management Shell from Microsoft Download Center:" -ForegroundColor Cyan
+            Write-Host "     https://www.microsoft.com/en-us/download/details.aspx?id=35588" -ForegroundColor Gray
+            Write-Host "  3. Use PnP PowerShell only (add -UsePnPOnly parameter to script)" -ForegroundColor Cyan
+            Write-Host "  4. Run PowerShell as Administrator and try again" -ForegroundColor Cyan
+            Write-Host "  5. Clear PowerShell module cache:" -ForegroundColor Cyan
+            Write-Host "     Remove-Item `$env:USERPROFILE\Documents\PowerShell\Modules\Microsoft.Online.SharePoint.PowerShell -Recurse -Force" -ForegroundColor Gray
+        }
+        else {
+            Write-Host "`nGeneral Troubleshooting Tips:" -ForegroundColor Yellow
+            Write-Host "  1. Ensure SharePoint Online Management Shell is installed:" -ForegroundColor Cyan
+            Write-Host "     Install-Module -Name Microsoft.Online.SharePoint.PowerShell -Force" -ForegroundColor Gray
+            Write-Host "  2. Run PowerShell as Administrator if needed" -ForegroundColor Cyan
+            Write-Host "  3. Check if you have the required permissions (SharePoint Admin or Global Admin)" -ForegroundColor Cyan
+            Write-Host "  4. Verify tenant name is correct (without -admin or .sharepoint.com suffix)" -ForegroundColor Cyan
+        }
+        
         return $false
     }
 }
@@ -218,15 +355,43 @@ function Get-AllSiteCollections {
     try {
         $sites = @()
         
-        # Get regular site collections
-        $regularSites = Get-SPOSite -Limit All -IncludePersonalSite $false | Where-Object {
-            $_.Template -notlike "*SRCHCEN*" -and 
-            $_.Template -notlike "*SPSMSITEHOST*" -and
-            $_.Template -notlike "*APPCATALOG*" -and
-            $_.Url -notlike "*-admin.sharepoint.com*"
+        if ($Global:UsePnPOnly -or $UsePnPOnly) {
+            # Use PnP PowerShell to get sites
+            Write-Host "  Using PnP PowerShell to retrieve sites..." -ForegroundColor Gray
+            
+            # Get all site collections using PnP
+            $pnpSites = Get-PnPTenantSite -IncludeOneDriveSites:$false -ErrorAction Stop | Where-Object {
+                $_.Template -notlike "*SRCHCEN*" -and 
+                $_.Template -notlike "*SPSMSITEHOST*" -and
+                $_.Template -notlike "*APPCATALOG*" -and
+                $_.Url -notlike "*-admin.sharepoint.com*" -and
+                $_.Template -notlike "*REDIRECTSITE*"
+            }
+            
+            # Convert PnP site objects to compatible format
+            foreach ($pnpSite in $pnpSites) {
+                $sites += [PSCustomObject]@{
+                    Url = $pnpSite.Url
+                    Title = $pnpSite.Title
+                    Template = $pnpSite.Template
+                    Owner = $pnpSite.Owner
+                    LastContentModifiedDate = $pnpSite.LastContentModifiedDate
+                    StorageUsageCurrent = $pnpSite.StorageUsageCurrent
+                }
+            }
         }
-        
-        $sites += $regularSites
+        else {
+            # Use SharePoint Online Management Shell
+            Write-Host "  Using SharePoint Online Management Shell to retrieve sites..." -ForegroundColor Gray
+            $spoSites = Get-SPOSite -Limit All -IncludePersonalSite $false | Where-Object {
+                $_.Template -notlike "*SRCHCEN*" -and 
+                $_.Template -notlike "*SPSMSITEHOST*" -and
+                $_.Template -notlike "*APPCATALOG*" -and
+                $_.Url -notlike "*-admin.sharepoint.com*"
+            }
+            
+            $sites += $spoSites
+        }
         
         # Apply site filter if specified
         if ($SiteFilter.Count -gt 0) {
@@ -246,6 +411,12 @@ function Get-AllSiteCollections {
     catch {
         Add-ErrorLog "Get-AllSiteCollections" $_.Exception.Message
         Write-Host "✗ Failed to retrieve site collections: $($_.Exception.Message)" -ForegroundColor Red
+        
+        if ($_.Exception.Message -like "*Access denied*" -or $_.Exception.Message -like "*Unauthorized*") {
+            Write-Host "`nPermission Error: You may not have sufficient permissions." -ForegroundColor Red
+            Write-Host "Required permissions: SharePoint Administrator or Global Administrator" -ForegroundColor Yellow
+        }
+        
         return @()
     }
 }
@@ -333,9 +504,13 @@ function Get-SitePermissions {
         # Get sharing links if requested
         if ($IncludeSharingLinks) {
             try {
-                $sharingLinks = Get-PnPSharingForNonOwnersOfFile -ErrorAction SilentlyContinue
-                # This is a placeholder - actual sharing link enumeration would require more complex logic
+                # Note: Sharing links enumeration requires additional permissions and complex logic
+                # This is a placeholder for future enhancement
                 Write-VerboseLog "Sharing links audit placeholder for site: $SiteUrl"
+                # Future implementation would include:
+                # - Get-PnPSiteCollectionAppCatalog for tenant apps
+                # - Custom REST API calls for sharing link details
+                # - Integration with Microsoft Graph for sharing reports
             }
             catch {
                 Write-VerboseLog "Could not retrieve sharing links for site: $SiteUrl"
