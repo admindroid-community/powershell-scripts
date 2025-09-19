@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Microsoft 365 PowerShell Modules Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1, h2 { color: #0078d4; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #0078d4; color: white; }
+        .status-good { background-color: #d4edda; }
+        .status-warning { background-color: #fff3cd; }
+        .status-error { background-color: #f8d7da; }
+        .summary { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>Microsoft 365 PowerShell Modules Report</h1>
+    <div class="summary">
+        <h2>Summary</h2>
+        <p><strong>Generated:</strong> 09/18/2025 16:15:00</p>
+        <p><strong>Total Modules:</strong> 7</p>
+        <p><strong>Installed:</strong> 7</p>
+        <p><strong>Fully Functional:</strong> 6</p>
+    </div>
+    
+    <h2>Module Details</h2>
+    <table>
+        <tr>
+            <th>Module Name</th>
+            <th>Category</th>
+            <th>Status</th>
+            <th>Version</th>
+            <th>Last Updated</th>
+            <th>Commands Available</th>
+            <th>Commands Missing</th>
+        </tr>        <tr class="status-good">
+            <td>Microsoft.Graph</td>
+            <td>Core</td>
+            <td>Fully Functional</td>
+            <td>2.30.0</td>
+            <td>2025-08-19</td>
+            <td>Connect-MgGraph, Get-MgContext, Get-MgUser</td>
+            <td></td>
+        </tr>        <tr class="status-warning">
+            <td>ExchangeOnlineManagement</td>
+            <td>Exchange</td>
+            <td>Partially Functional</td>
+            <td>3.9.0</td>
+            <td>2025-08-13</td>
+            <td>Connect-ExchangeOnline</td>
+            <td>Get-Mailbox</td>
+        </tr>        <tr class="status-good">
+            <td>Microsoft.Graph.Intune</td>
+            <td>Intune</td>
+            <td>Fully Functional</td>
+            <td>6.1907.1.0</td>
+            <td>2019-07-11</td>
+            <td>Connect-MSGraph, Get-IntuneManagedDevice</td>
+            <td></td>
+        </tr>        <tr class="status-good">
+            <td>Microsoft.PowerApps.Administration.PowerShell</td>
+            <td>PowerPlatform</td>
+            <td>Fully Functional</td>
+            <td>2.0.216</td>
+            <td>2025-09-12</td>
+            <td>Add-PowerAppsAccount, Get-PowerAppEnvironment</td>
+            <td></td>
+        </tr>        <tr class="status-good">
+            <td>Microsoft.Online.SharePoint.PowerShell</td>
+            <td>SharePoint</td>
+            <td>Fully Functional</td>
+            <td>16.0.25814.0</td>
+            <td>2002-02-02</td>
+            <td>Connect-SPOService, Get-SPOSite</td>
+            <td></td>
+        </tr>        <tr class="status-good">
+            <td>PnP.PowerShell</td>
+            <td>SharePoint</td>
+            <td>Fully Functional</td>
+            <td>3.1.0</td>
+            <td>2025-04-18</td>
+            <td>Connect-PnPOnline, Get-PnPContext</td>
+            <td></td>
+        </tr>        <tr class="status-good">
+            <td>MicrosoftTeams</td>
+            <td>Teams</td>
+            <td>Fully Functional</td>
+            <td>7.3.1</td>
+            <td>2025-08-21</td>
+            <td>Connect-MicrosoftTeams, Get-Team</td>
+            <td></td>
+        </tr>    </table>
+    
+    <h2>Recommendations</h2>
+    <ul>        <li>Run regular updates with: Update-Module ModuleName</li>
+        <li>Review the complete usage guide for detailed instructions</li>
+    </ul>
+</body>
+</html>
