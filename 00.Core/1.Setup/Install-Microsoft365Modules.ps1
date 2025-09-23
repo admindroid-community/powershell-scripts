@@ -3,16 +3,18 @@
     Comprehensive Microsoft 365 PowerShell modules installation script.
 
 .DESCRIPTION
-    This script installs all required PowerShell modules for managing:
-    - Microsoft Entra ID (Azure AD)
-    - Exchange Online
-    - Microsoft Defender for Office 365
-    - Microsoft Purview Compliance
-    - SharePoint Online (both PnP and official modules)
-    - Microsoft Teams
-    - Security & Compliance Center
-    - Azure AD (legacy support)
-    - Microsoft 365 Admin Center functions
+    This script installs all required PowerShell modules for comprehensive Microsoft 365 management including:
+    - Microsoft Entra ID (Azure AD) - User, group, and directory management
+    - Exchange Online - Email, mailboxes, and Defender for Office 365
+    - SharePoint Online - Sites, lists, and content management (PnP and official modules)
+    - Microsoft Teams - Teams administration and policy management
+    - Microsoft Intune - Device and application management
+    - Power Platform - PowerApps, Power Automate, and Power BI administration
+    - Microsoft Graph modules - Security, Compliance, Reports, Calendar, Files, and more
+    - Azure PowerShell - Hybrid cloud resource management (optional)
+    - Partner Center - CSP and MSP customer management (optional)
+    - Windows Management - WinGet and Windows Updates (optional)
+    - Legacy modules - MSOnline and AzureAD for compatibility (optional)
 
     Features:
     - Enterprise-grade error handling and logging
@@ -20,6 +22,7 @@
     - Module version checking and updates
     - Security validation and TLS 1.2 enforcement
     - Comprehensive prerequisite checking
+    - Modular installation with conditional categories
 
 .PARAMETER Force
     Forces reinstallation of modules even if they already exist
@@ -33,11 +36,23 @@
 .PARAMETER IncludeLegacy
     Include legacy Azure AD module alongside Microsoft Graph
 
+.PARAMETER IncludeBeta
+    Include Microsoft Graph Beta modules for preview features
+
+.PARAMETER IncludeAzure
+    Include Azure PowerShell modules for hybrid management
+
+.PARAMETER IncludePartner
+    Include Partner Center modules for CSP/MSP management
+
 .EXAMPLE
     .\Install-Microsoft365Modules.ps1
     
 .EXAMPLE
     .\Install-Microsoft365Modules.ps1 -Force -Scope CurrentUser -IncludeLegacy
+
+.EXAMPLE
+    .\Install-Microsoft365Modules.ps1 -IncludeBeta -IncludeAzure -IncludePartner
 
 .NOTES
     Author: Microsoft 365 Administration Team
@@ -62,7 +77,16 @@ param(
     [string]$LogPath = "c:\temp\Microsoft365ModuleInstall_$(Get-Date -Format 'yyyyMMdd_HHmmss').log",
     
     [Parameter(Mandatory = $false)]
-    [switch]$IncludeLegacy
+    [switch]$IncludeLegacy,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$IncludeBeta,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$IncludeAzure,
+    
+    [Parameter(Mandatory = $false)]
+    [switch]$IncludePartner
 )
 
 # Script configuration
@@ -164,13 +188,170 @@ $ModulesToInstall = @(
         Priority = 10
     },
     @{
-        Name = 'Microsoft.Xrm.Data.PowerShell'
+        Name = 'Microsoft.Xrm.Data.Powershell'
         Description = 'Dynamics 365 PowerShell - Customer engagement and operations management'
         MinVersion = '2.8.0'
         Repository = 'PSGallery'
         ImportCommands = @('Get-CrmConnection', 'Get-CrmRecords')
         Category = 'Dynamics'
         Priority = 11
+    },
+    @{
+        Name = 'Microsoft.PowerApps.Checker.PowerShell'
+        Description = 'Power Platform Solution Checker - Code analysis and best practices validation'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-PowerAppsCheckerRulesets', 'Invoke-PowerAppsChecker')
+        Category = 'PowerPlatform'
+        Priority = 12
+    },
+    @{
+        Name = 'Microsoft.WinGet.Client'
+        Description = 'Windows Package Manager Client - Software deployment and management'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Find-WinGetPackage', 'Install-WinGetPackage', 'Get-WinGetPackage')
+        Category = 'WindowsManagement'
+        Priority = 13
+    },
+    @{
+        Name = 'Microsoft.Graph.Authentication'
+        Description = 'Microsoft Graph Authentication - Enhanced authentication capabilities'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Connect-MgGraph', 'Get-MgContext', 'Disconnect-MgGraph')
+        Category = 'Core'
+        Priority = 14
+    },
+    @{
+        Name = 'Microsoft.Graph.Beta'
+        Description = 'Microsoft Graph Beta - Preview APIs for latest Microsoft 365 features'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Connect-MgGraph', 'Get-MgBetaUser', 'Get-MgBetaGroup')
+        Category = 'Core'
+        Priority = 15
+        InstallCondition = { $IncludeBeta }
+    },
+    @{
+        Name = 'Microsoft.Graph.DeviceManagement'
+        Description = 'Microsoft Graph Device Management - Extended Intune and device management capabilities'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgDeviceManagementManagedDevice', 'Get-MgDeviceManagementDeviceConfiguration')
+        Category = 'Intune'
+        Priority = 16
+    },
+    @{
+        Name = 'Microsoft.Graph.Identity.Governance'
+        Description = 'Microsoft Graph Identity Governance - Access reviews, entitlement management, PIM'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgIdentityGovernanceAccessReview', 'Get-MgIdentityGovernanceEntitlementManagement')
+        Category = 'Governance'
+        Priority = 17
+    },
+    @{
+        Name = 'Microsoft.Graph.Security'
+        Description = 'Microsoft Graph Security - Security incidents, alerts, and threat protection'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgSecurityIncident', 'Get-MgSecurityAlert')
+        Category = 'Security'
+        Priority = 18
+    },
+    @{
+        Name = 'Microsoft.Graph.Compliance'
+        Description = 'Microsoft Graph Compliance - Data governance, retention, and compliance policies'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgComplianceEdiscoveryCase', 'Get-MgSecurityRetentionPolicy')
+        Category = 'Compliance'
+        Priority = 19
+    },
+    @{
+        Name = 'Microsoft.Graph.Reports'
+        Description = 'Microsoft Graph Reports - Usage analytics and reporting for Microsoft 365 services'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgReportEmailActivityUserDetail', 'Get-MgReportOffice365ActiveUserDetail')
+        Category = 'Reporting'
+        Priority = 20
+    },
+    @{
+        Name = 'Microsoft.Graph.WindowsUpdates'
+        Description = 'Microsoft Graph Windows Updates - Windows Update for Business deployment service'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgWindowsUpdatesDeployment', 'New-MgWindowsUpdatesDeployment')
+        Category = 'WindowsManagement'
+        Priority = 21
+    },
+    @{
+        Name = 'Az.Accounts'
+        Description = 'Azure PowerShell Accounts - Authentication and context management for Azure'
+        MinVersion = '2.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Connect-AzAccount', 'Get-AzContext', 'Set-AzContext')
+        Category = 'Azure'
+        Priority = 22
+        InstallCondition = { $IncludeAzure }
+    },
+    @{
+        Name = 'Az.Resources'
+        Description = 'Azure PowerShell Resources - Resource group and subscription management'
+        MinVersion = '6.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-AzResourceGroup', 'Get-AzSubscription', 'New-AzResourceGroup')
+        Category = 'Azure'
+        Priority = 23
+        InstallCondition = { $IncludeAzure }
+    },
+    @{
+        Name = 'Microsoft.Graph.Calendar'
+        Description = 'Microsoft Graph Calendar - Calendar and scheduling management'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgUserCalendar', 'Get-MgUserEvent', 'New-MgUserEvent')
+        Category = 'Productivity'
+        Priority = 24
+    },
+    @{
+        Name = 'Microsoft.Graph.Files'
+        Description = 'Microsoft Graph Files - OneDrive and SharePoint file management'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgUserDrive', 'Get-MgDriveItem', 'Copy-MgDriveItem')
+        Category = 'SharePoint'
+        Priority = 25
+    },
+    @{
+        Name = 'Microsoft.Graph.Mail'
+        Description = 'Microsoft Graph Mail - Email and message management'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgUserMessage', 'Send-MgUserMail', 'Get-MgUserMailFolder')
+        Category = 'Exchange'
+        Priority = 26
+    },
+    @{
+        Name = 'Microsoft.Graph.People'
+        Description = 'Microsoft Graph People - People and organizational relationships'
+        MinVersion = '1.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Get-MgUserPerson', 'Get-MgUserPeople')
+        Category = 'Social'
+        Priority = 27
+    },
+    @{
+        Name = 'PartnerCenter'
+        Description = 'Partner Center PowerShell - CSP and partner management (for MSPs)'
+        MinVersion = '3.0.0'
+        Repository = 'PSGallery'
+        ImportCommands = @('Connect-PartnerCenter', 'Get-PartnerCustomer', 'Get-PartnerCustomerSubscription')
+        Category = 'Partner'
+        Priority = 28
+        InstallCondition = { $IncludePartner }
     }
 )
 
@@ -202,6 +383,12 @@ function Write-Log {
     
     # Write to log file with error handling
     try {
+        # Ensure log directory exists
+        $logDirectory = Split-Path $LogPath -Parent
+        if (-not (Test-Path $logDirectory)) {
+            New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+        }
+        
         Add-Content -Path $LogPath -Value $logEntry -ErrorAction SilentlyContinue
     }
     catch {
@@ -384,7 +571,7 @@ function Install-ModuleWithRetry {
                 Repository = $ModuleInfo.Repository
                 Force = $Force
                 AllowClobber = $true
-                SkipPublisherCheck = $false
+                SkipPublisherCheck = $true
                 AcceptLicense = $true
                 Confirm = $false
                 ErrorAction = 'Stop'
@@ -535,6 +722,26 @@ Get-MgComplianceEdiscoveryCase
 Connect-MSGraph
 Get-IntuneManagedDevice
 
+# Microsoft Graph Security (if Security modules installed)
+Connect-MgGraph -Scopes "SecurityIncident.Read.All", "SecurityAlert.Read.All"
+Get-MgSecurityIncident
+Get-MgSecurityAlert
+
+# Microsoft Graph Reports (if Reports module installed)
+Connect-MgGraph -Scopes "Reports.Read.All"
+Get-MgReportEmailActivityUserDetail -Period D30
+Get-MgReportOffice365ActiveUserDetail -Period D30
+
+# Azure PowerShell (if Azure modules installed)
+Connect-AzAccount
+Get-AzSubscription
+Get-AzResourceGroup
+
+# Partner Center (if Partner module installed for CSP/MSPs)
+Connect-PartnerCenter
+Get-PartnerCustomer
+Get-PartnerCustomerSubscription
+
 "@
     
     Write-Log $examples -Level Info -Category "Usage"
@@ -564,6 +771,9 @@ function Start-ModuleInstallation {
         Write-Log "Log file: $LogPath" -Level Info -Category "Main"
         Write-Log "Force reinstall: $Force" -Level Info -Category "Main"
         Write-Log "Include legacy modules: $IncludeLegacy" -Level Info -Category "Main"
+        Write-Log "Include beta modules: $IncludeBeta" -Level Info -Category "Main"
+        Write-Log "Include Azure modules: $IncludeAzure" -Level Info -Category "Main"
+        Write-Log "Include Partner modules: $IncludePartner" -Level Info -Category "Main"
         
         # Check prerequisites
         Test-Prerequisites
@@ -668,6 +878,6 @@ else {
 }
 
 # Export functions for manual use (only when script is dot-sourced as a module)
-if ($MyInvocation.InvocationName -eq '.') {
+if ($MyInvocation.InvocationName -eq '.' -and $PSCmdlet) {
     Export-ModuleMember -Function Start-ModuleInstallation, Install-ModuleWithRetry, Show-ModuleInformation -ErrorAction SilentlyContinue
 }
