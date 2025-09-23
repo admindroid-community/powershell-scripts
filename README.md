@@ -13,23 +13,24 @@ Welcome to our comprehensive PowerShell repository containing hundreds of script
 5. **Auditing:** Monitor M365 activities to identify suspicious users and unauthorized accesses.
 6. **Export:** Export the report into a well formatted CSV file.
 7. **Scheduling:** Most scripts support scheduling capability to generate the report periodically.
-6. **Customizable:** Easily modify scripts to fit specific needs.
+8. **Customizable:** Easily modify scripts to fit specific needs.
 
 ### Script usage instruction
 
- - Each script is self-contained and includes detailed comments and usage examples.
- - Most scripts have built-in parameters and switch parameters to manage and report on your Microsoft 365 environment granularly.
- - For more detailed use cases, refer to the linked blog within the script.
+* Each script is self-contained and includes detailed comments and usage examples.
+* Most scripts have built-in parameters and switch parameters to manage and report on your Microsoft 365 environment granularly.
+* For more detailed use cases, refer to the linked blog within the script.
 
-## Need more than what these scripts offer?? - **Try Free Microsoft 365 Reporting Tool by AdminDroid**
+## Need more than what these scripts offer?? - **Try Free Microsoft 365 Administration Tool by AdminDroid**
 
-AdminDroid's free Microsoft 365 reporting tool offers ***120+ essential reports and dashboards for free***. The report includes users, groups, group membership, licenses, license expiry, sign-in activities, password changes, license changes, MFA changes, admin role changes, etc.
+AdminDroid's free Microsoft 365 management tool offers ***120+ essential reports, 60+ key management actions, and dashboards for free***. The report includes users, groups, group membership, licenses, license expiry, sign-in activities, password changes, license changes, MFA changes, admin role changes, etc.
 
 Download [AdminDroid Microsoft 365 administration
 tool](https://admindroid.com/download?src=GitHub) to experience the power of AdminDroid.
 
-Additionally, AdminDroid Microsoft 365 administration tool provides ***1900+ pre-built reports, 30+ insightful dashboards*** and ***75+ ready to deploy alert policy templates*** to get complete visibility into your Microsoft 365 organization. 
+Additionally, AdminDroid Microsoft 365 administration tool provides ***3000+ pre-built reports, 100+ insightful dashboards, 450+ management actions*** and ***85+ ready to deploy alert policy templates*** to manage your Microsoft 365 organization effortlessly.
 
 
-*Try out the demo to see the full range of features in action: <https://demo.admindroid.com>*
- 
+
+*Try out the demo to see the full range of features in action:* [*https://demo.admindroid.com*](https://demo.admindroid.com)
+
