@@ -2,7 +2,19 @@
 =============================================================================================
 Name:           Connect to MS Graph PowerShell using Certificate
 Description:    This script automates Azure app registration
+Version:        1.1
+website:        blog.admindroid.com
+
+
 For detailed Script execution: https://blog.admindroid.com/connect-to-microsoft-graph-powershell-using-certificate/
+
+
+Change Log
+~~~~~~~~~~
+
+ V1.0 (Mar 14, 2023) - File created
+ V1.1 (Sep 30, 2025) - Included -All param while retrieving app registrations to avoid app not found error.
+
 ============================================================================================
 #>
 param (
@@ -243,7 +255,7 @@ function GrantPermission
 Function ShowAppDetails
 {
     Write-Host "`nApp info:" -ForegroundColor Magenta
-    $GetAppInfo = Get-MgApplication|?{$_.AppId -eq "$APPID"}
+    $GetAppInfo = Get-MgApplication -All |?{$_.AppId -eq "$APPID"}
     $Owner = Get-MgApplicationOwner -ApplicationId $GetAppInfo.Id|Select-Object -ExpandProperty AdditionalProperties
     $Script:CertificateList = $GetAppInfo.KeyCredentials
     $AppInfo=[pscustomobject]@{'App Name'              = $GetAppInfo.DisplayName
@@ -282,7 +294,7 @@ Function RevokeCertificate
     Write-Progress -Activity "Revoking certificate"
     $NewKeys = @()
     $APPID = Read-Host "Enter an application ID(Client ID) you want to revoke the certificate for that app"
-    $GetAppInfo = Get-MgApplication |?{$_.AppId -eq "$APPID"}
+    $GetAppInfo = Get-MgApplication -All |?{$_.AppId -eq "$APPID"}
     if($GetAppInfo -ne $null)
     {
         ShowAppDetails
@@ -406,7 +418,7 @@ switch($Action){
    3 {
         ConnectMgGraphModule
         $APPID = Read-Host "Enter the application id(Client id) of the app:"
-        $AppInfo = Get-MgApplication |?{$_.AppId -eq "$APPID"}
+        $AppInfo = Get-MgApplication -All |?{$_.AppId -eq "$APPID"}
         if($AppInfo -eq $null)
         {
             Write-Host "Application not found." -ForegroundColor Red
