@@ -1,7 +1,7 @@
 ﻿<#
 =============================================================================================
 Name:         Identify MFA Deployment Sources in Microsoft 365 Using PowerShell
-Version:      2.0
+Version:      3.0
 website:      o365reports.com
 
 ~~~~~~~~~~~~~~~~~~
@@ -11,7 +11,7 @@ Script Highlights:
 2. Helps you understand user MFA registration status (registered or not) to plan your MFA rollout campaigns efficiently.
 3. It specifically identifies MFA sources for external users as well. 
 4. The script checks which Conditional Access policies demand MFA and tells you if users have registered for that MFA method as required by those policies.
-5. Automatically install the missing required module Microsoft Graph Beta with your confirmation.
+5. Automatically install the missing required module Microsoft Graph with your confirmation.
 6. The script can be executed with an MFA-enabled account too.  
 7. Exports report results as a CSV file. 
 8. The script is scheduler-friendly, making it easy to automate.
@@ -23,6 +23,7 @@ Change Log:
   V1.0 (Jul 03, 2024) - File created
   V1.1 (Nov 04, 2024) - Scope updation to resolve permission issue
   v2.0 (Jun 27, 2025) - Removed MSOnline PowerShell module to retrieve per-user MFA status and used Graph API.
+  v3.0 (Nov 06, 2025) - Upgraded from the 'MS Graph beta module' to Microsoft Graph module and modified to iterate over Policy IDs to find all assigned policies.
 
 
 For detailed Script execution: : https://o365reports.com/2024/06/26/identity-mfa-deployment-source-in-microsoft-365-using-powershell/
@@ -31,26 +32,26 @@ For detailed Script execution: : https://o365reports.com/2024/06/26/identity-mfa
 ============================================================================================
 #>
 param 
-(    
-     [string]$TenantId,
-     [string]$AppId,
-     [string]$CertificateThumbprint
+(   
+    [string]$TenantId,
+    [string]$AppId,
+    [string]$CertificateThumbprint
 )
 
 $ErrorActionPreference = "Stop"
-# Check if Microsoft Graph Beta module is installed
-$MsGraphModule =  Get-Module Microsoft.Graph.Beta -ListAvailable
+# Check if Microsoft Graph module is installed
+$MsGraphModule =  Get-Module Microsoft.Graph -ListAvailable
 if($MsGraphModule -eq $null)
 { 
-    Write-host "Important: Microsoft Graph Beta module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-    $confirm = Read-Host Are you sure you want to install Microsoft Graph Beta module? [Y] Yes [N] No  
+    Write-host "Important: Microsoft Graph module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
+    $confirm = Read-Host Are you sure you want to install Microsoft Graph module? [Y] Yes [N] No  
     if($confirm -match "[yY]") { 
-        Write-host "Installing Microsoft Graph Beta module..."
-        Install-Module Microsoft.Graph.Beta -Scope CurrentUser -AllowClobber
-        Write-host "Microsoft Graph Beta module is installed in the machine successfully" -ForegroundColor Magenta 
+        Write-host "Installing Microsoft Graph module..."
+        Install-Module Microsoft.Graph -Scope CurrentUser -AllowClobber
+        Write-host "Microsoft Graph module is installed in the machine successfully" -ForegroundColor Magenta 
     } 
     else { 
-        Write-host "Exiting. `nNote: Microsoft Graph Beta module must be available in your system to run the script" -ForegroundColor Red
+        Write-host "Exiting. `nNote: Microsoft Graph module must be available in your system to run the script" -ForegroundColor Red
         Exit 
     } 
 }
@@ -65,56 +66,56 @@ function Process-ExternalUsers
         [System.Array] $LocalGuest,
         [System.Array] $B2BDirectConnect
     )
-     $processedUsers = @()
-     if ($ExternalTenantUser) 
-     {
-        $Members = $ExternalTenantUser.ExternalTenants.AdditionalProperties.members
-        if ($Members) 
-        {
-            foreach ($Member in $Members) 
-            {
-                if ($UsersinTenant.ContainsKey($Member)) 
-                {
-                    $processedUsers += $ExternalTenantUser.GuestOrExternalUserTypes -split ',' | ForEach-Object {
-                        switch -Wildcard ($_) 
-                        {
-                            'b2bCollaborationGuest' {
-                                $B2BGuest | Where-Object { $_ -in $UsersinTenant[$Member] }
-                            }
-                            'b2bCollaborationMember' {
-                                $B2BMember | Where-Object { $_ -in $UsersinTenant[$Member] }
-                            }
-                            'internalGuest' {
-                                $LocalGuest
-                            }
-                            'b2bDirectConnectUser' {
-                                $B2BDirectConnect | Select-Object -Unique | Where-Object { $_.Id -in $UsersinTenant[$Member] }
-                            }
-                        }
-                    }
-                }
-            }
-        } 
-        else 
-        {
-            $processedUsers += $ExternalTenantUser.GuestOrExternalUserTypes -split ',' | ForEach-Object {
-                switch -Wildcard ($_) {
-                    'b2bCollaborationGuest' {
-                        $B2BGuest
-                    }
-                    'b2bCollaborationMember' {
-                        $B2BMember
-                    }
-                    'internalGuest' {
-                        $LocalGuest
-                    }
-                    'b2bDirectConnectUser' {
-                        $B2BDirectConnect | Select-Object -Unique
-                    }
-                }
-            }
-        }
-    }
+      $processedUsers = @()
+      if ($ExternalTenantUser) 
+      {
+         $Members = $ExternalTenantUser.ExternalTenants.AdditionalProperties.members
+         if ($Members) 
+         {
+             foreach ($Member in $Members) 
+             {
+                 if ($UsersinTenant.ContainsKey($Member)) 
+                 {
+                     $processedUsers += $ExternalTenantUser.GuestOrExternalUserTypes -split ',' | ForEach-Object {
+                         switch -Wildcard ($_) 
+                         {
+                             'b2bCollaborationGuest' {
+                                 $B2BGuest | Where-Object { $_ -in $UsersinTenant[$Member] }
+                             }
+                             'b2bCollaborationMember' {
+                                 $B2BMember | Where-Object { $_ -in $UsersinTenant[$Member] }
+                             }
+                             'internalGuest' {
+                                 $LocalGuest
+                             }
+                             'b2bDirectConnectUser' {
+                                 $B2BDirectConnect | Select-Object -Unique | Where-Object { $_.Id -in $UsersinTenant[$Member] }
+                             }
+                         }
+                     }
+                 }
+             }
+         } 
+         else 
+         {
+             $processedUsers += $ExternalTenantUser.GuestOrExternalUserTypes -split ',' | ForEach-Object {
+                 switch -Wildcard ($_) {
+                     'b2bCollaborationGuest' {
+                         $B2BGuest
+                     }
+                     'b2bCollaborationMember' {
+                         $B2BMember
+                     }
+                     'internalGuest' {
+                         $LocalGuest
+                     }
+                     'b2bDirectConnectUser' {
+                         $B2BDirectConnect | Select-Object -Unique
+                     }
+                 }
+             }
+         }
+      }
 
     return $processedUsers
 }
@@ -131,7 +132,7 @@ function Get-UserIdsByRole {
     foreach ($Role in $Roles) {
         $DirRole = $DirectoryRole | Where-Object { $_.RoleTemplateId -eq $Role }
         if ($DirRole) {
-            $RoleMembers = Get-MgBetaDirectoryRoleMember -DirectoryRoleId $DirRole.Id
+            $RoleMembers = Get-MgDirectoryRoleMember -DirectoryRoleId $DirRole.Id
             if ($RoleMembers) {
                 $UserIds += $RoleMembers.Id
             }
@@ -151,7 +152,7 @@ Write-Host "`nConnecting to Microsoft Graph..."
 if(($TenantId -ne "") -and ($ClientId -ne "") -and ($CertificateThumbprint -ne ""))  
 {  
     Connect-MgGraph -TenantId $TenantId -AppId $ClientId -CertificateThumbprint $CertificateThumbprint -ErrorAction SilentlyContinue -ErrorVariable ConnectionError | Out-Null
-    if($ConnectionError -ne $null) {    
+    if($ConnectionError -ne $null) {   
         Write-Host $ConnectionError -Foregroundcolor Red
         Exit
     }
@@ -168,13 +169,13 @@ else
 }
 
 Write-Host "`nRetrieving Entra Users..."
-$MgUsers  = Get-MgBetaUser -All | Sort-Object DisplayName
+$MgUsers  = Get-MgUser -All | Sort-Object DisplayName
 #Check Security Default is enabled or not
-$SecurityDefault = (Get-MgBetaPolicyIdentitySecurityDefaultEnforcementPolicy).IsEnabled
-$DirectoryRole = Get-MgBetaDirectoryRole -All
+$SecurityDefault = (Get-MgPolicyIdentitySecurityDefaultEnforcementPolicy).IsEnabled
+$DirectoryRole = Get-MgDirectoryRole -All
 
 #Get the User Rgistration Details
-$UserAuthenticationDetail = Get-MgBetaReportAuthenticationMethodUserRegistrationDetail -All | Select-Object UserPrincipalName, MethodsRegistered, IsMFARegistered , Id
+$UserAuthenticationDetail = Get-MgReportAuthenticationMethodUserRegistrationDetail -All | Select-Object UserPrincipalName, MethodsRegistered, IsMFARegistered , Id
 $ProcessedUserCount =0
 
 #check for Security default if disabled start to process the Conditional access policies
@@ -193,87 +194,92 @@ else
     $ExcludeUsers = @()
     $Registered = @()
     $NotRegistered = @()
+    
+    # Use Policy ID as the key for user inclusion and hashtable to map unique Policy ID to Display Name
     $UsersInPolicy = @{}
+    $PolicyDetails = @{}
+
     # Get conditional access policies that involve MFA and enabled
-    $Policies = Get-MgBetaIdentityConditionalAccessPolicy -All | Where-Object { ($_.GrantControls.BuiltInControls -contains 'mfa' -or $_.GrantControls.AuthenticationStrength.RequirementsSatisfied -contains 'mfa') -and $_.State -contains 'enabled' }
+    $Policies = Get-MgIdentityConditionalAccessPolicy -All | Where-Object { ($_.GrantControls.BuiltInControls -contains 'mfa' -or $_.GrantControls.AuthenticationStrength.RequirementsSatisfied -contains 'mfa') -and $_.State -contains 'enabled' }
     $Policy = $Policies | Where-Object { $_.displayname -eq 'Authentication' } 
     $ProcessedPolicyCount = 0
+
     #Get the External users if it was specified in the policy
     if($Policies.Conditions.Users.IncludeGuestsOrExternalUsers -ne $null -or $Policies.Conditions.Users.ExcludeGuestsOrExternalUsers -ne $null)
     {
-        $ExternalUsers = $MgUsers | where-object {$_.ExternalUserState -ne $null}
-                        $UsersinTenant = @{}
-                        foreach($GuestUser in $ExternalUsers)
-                        {
-                            try
-                            {
-                                if($GuestUser.othermails -ne $null)
-                                {
-                                    $Parts = $GuestUser.othermails -split "@"
-                                    $DomainName = $Parts[1]
-                                    $Url = "https://login.microsoftonline.com/$DomainName/.well-known/openid-configuration"
-                                    $Response = Invoke-RestMethod -Uri $Url -Method Get
-                                    $Issuer = $Response.issuer
-                                    $TenantId = [regex]::Match($Issuer, "[a-f0-9]{8}-([a-f0-9]{4}-){3}[a-f0-9]{12}").Value
-                                    if (-not $UsersinTenant.ContainsKey($TenantId))
-                                    {
-                                        $UsersinTenant[$TenantId] = @($GuestUser.Id)
-                                    } 
-                                    else
-                                    {
-                                        $UsersinTenant[$TenantId] += $GuestUser.Id 
-                                    }
-                                }
-                            }
-                            catch
-                            {
-                                Write-Host "External Domain Name $DomainName is Invalid" -ForegroundColor Red
-                                continue;
-                            }
-                        }
-        $B2BGuest    = $ExternalUsers | where-object {$_.UserType -eq 'Guest'}
-        $B2BMember   = $ExternalUsers | where-object {$_.UserType -ne 'Member'}
-        $LocalGuest  = $MgUsers   | where-object { $_.ExternalUserState -eq $null -and $_.UserType -eq 'Guest'}
+         $ExternalUsers = $MgUsers | where-object {$_.ExternalUserState -ne $null}
+                         $UsersinTenant = @{}
+                         foreach($GuestUser in $ExternalUsers)
+                         {
+                             try
+                             {
+                                 if($GuestUser.othermails -ne $null)
+                                 {
+                                     $Parts = $GuestUser.othermails -split "@"
+                                     $DomainName = $Parts[1]
+                                     $Url = "https://login.microsoftonline.com/$DomainName/.well-known/openid-configuration"
+                                     $Response = Invoke-RestMethod -Uri $Url -Method Get
+                                     $Issuer = $Response.issuer
+                                     $TenantId = [regex]::Match($Issuer, "[a-f0-9]{8}-([a-f0-9]{4}-){3}[a-f0-9]{12}").Value
+                                     if (-not $UsersinTenant.ContainsKey($TenantId))
+                                     {
+                                         $UsersinTenant[$TenantId] = @($GuestUser.Id)
+                                     } 
+                                     else
+                                     {
+                                         $UsersinTenant[$TenantId] += $GuestUser.Id 
+                                     }
+                                 }
+                             }
+                             catch
+                             {
+                                 Write-Host "External Domain Name $DomainName is Invalid" -ForegroundColor Red
+                                 continue;
+                             }
+                         }
+         $B2BGuest    = $ExternalUsers | where-object {$_.UserType -eq 'Guest'}
+         $B2BMember   = $ExternalUsers | where-object {$_.UserType -ne 'Member'}
+         $LocalGuest  = $MgUsers    | where-object { $_.ExternalUserState -eq $null -and $_.UserType -eq 'Guest'}
 
-        #B2B Direct connect
-        $Groups = Get-MgBetaTeam -All
-        $B2BDirectConnect = @()
-        ForEach($ExternalUser in $ExternalUsers)
-        {
-            $MemberOfs = Get-MgBetaUserMemberof -UserId $ExternalUser.Id | Where-Object {$_.Id -ne $null}
-            ForEach($MemberOf in $MemberOfs)
-            {
-                if($Groups.Id -contains $MemberOf.Id)
-                {
-                    $B2BDirectConnect += $ExternalUser.Id 
-                }
-            }
-        }
-        
+         #B2B Direct connect
+         $Groups = Get-MgTeam -All
+         $B2BDirectConnect = @()
+         ForEach($ExternalUser in $ExternalUsers)
+         {
+             $MemberOfs = Get-MgUserMemberof -UserId $ExternalUser.Id | Where-Object {$_.Id -ne $null}
+             ForEach($MemberOf in $MemberOfs)
+             {
+                 if($Groups.Id -contains $MemberOf.Id)
+                 {
+                     $B2BDirectConnect += $ExternalUser.Id 
+                 }
+             }
+         }
+         
     }
 
-    #Hash table ofthe Required Authentication Strength with respect to the Registered method
+    #Hash table of the Required Authentication Strength with respect to the Registered method
     $AllowedCombinations = @{
-        "mobilephone"                         = @("sms","Password,sms")
-        "alternateMobilePhone"                = @("sms","Password,sms")
-        "officePhone"                         = @("sms","Password,sms")
-        "microsoftAuthenticatorPush"          = @("microsoftAuthenticatorPush", "Password,microsoftAuthenticatorPush")
-        "softwareOneTimePasscode"             = @("Password,SoftwareOath")
+        "mobilephone"                       = @("sms","Password,sms")
+        "alternateMobilePhone"              = @("sms","Password,sms")
+        "officePhone"                       = @("sms","Password,sms")
+        "microsoftAuthenticatorPush"        = @("microsoftAuthenticatorPush", "Password,microsoftAuthenticatorPush")
+        "softwareOneTimePasscode"           = @("Password,SoftwareOath")
         "MicrosoftAuthenticatorPzasswordless" = @("MicrosoftAuthenticator(PhoneSignIn)")
-        "windowsHelloForBusiness"             = @("windowsHelloForBusiness")
-        "hardwareOneTimePasscode"             = @("password,hardwareOath")
-        "passKeyDeviceBound"                  = @("fido2")
+        "windowsHelloForBusiness"           = @("windowsHelloForBusiness")
+        "hardwareOneTimePasscode"           = @("password,hardwareOath")
+        "passKeyDeviceBound"                = @("fido2")
         "passKeyDeviceBoundAuthenticator"     = @("fido2")
-        "passKeyDeviceBoundWindowsHello"      = @("fido2")
-        "fido2SecurityKey"                    = @("fido2")
-        "temporaryAccessPass"                 = @("TemporaryAccessPassOneTime", "TemporaryAccessPassMultiuse")
+        "passKeyDeviceBoundWindowsHello"    = @("fido2")
+        "fido2SecurityKey"                  = @("fido2")
+        "temporaryAccessPass"               = @("TemporaryAccessPassOneTime", "TemporaryAccessPassMultiuse")
     }
 
     # Loop through each policy
     foreach ( $Policy in $Policies) 
     {
         $ProcessedPolicyCount++
-        Write-Progress -Activity "`n    Processed Policy count: $ProcessedPolicyCount `n" -Status "Currently processing Policy: $($Policy.DisplayName)"
+        Write-Progress -Activity "`n     Processed Policy count: $ProcessedPolicyCount `n" -Status "Currently processing Policy: $($Policy.DisplayName)"
             ### Conditions ###
             $IncludeUsers         = $null
             $ExcludeUsers         = $null
@@ -282,35 +288,41 @@ else
             $IncludedExternalUser = $Policy.Conditions.Users.IncludeGuestsOrExternalUsers
             $ExcludedExternalUser = $Policy.Conditions.Users.ExcludeGuestsOrExternalUsers
             $IncludeUsers         = if($Policy.Conditions.Users.IncludeUsers -ne 'All') 
-                                    {
-                                        $Policy.Conditions.Users.IncludeUsers
-                                    }
-                                    elseif($Policy.Conditions.Users.IncludeUsers -eq 'All')
-                                    {
-                                       $MgUsers.Id 
-                                       $Check = $false
-                                    }
+                                        {
+                                            $Policy.Conditions.Users.IncludeUsers
+                                        }
+                                        elseif($Policy.Conditions.Users.IncludeUsers -eq 'All')
+                                        {
+                                            $MgUsers.Id 
+                                            $Check = $false
+                                        }
             if($Check)
             {
-                $IncludeUsers   += if($Policy.Conditions.Users.IncludeGroups){ $Policy.Conditions.Users.IncludeGroups | ForEach-Object { if ($Members = Get-MgBetaGroupMember -GroupId $_) { $Members.Id}if($Owner = Get-MgBetaGroupOwner -GroupId $_){$Owner.Id} } }
+                $IncludeUsers   += if($Policy.Conditions.Users.IncludeGroups){ $Policy.Conditions.Users.IncludeGroups | ForEach-Object { if ($Members = Get-MgGroupMember -GroupId $_) { $Members.Id}if($Owner = Get-MgGroupOwner -GroupId $_){$Owner.Id} } }
                 $IncludeUsers   += Get-UserIdsByRole -Roles $Policy.Conditions.Users.IncludeRoles -DirectoryRole $DirectoryRole
                 $IncludeUsers   += Process-ExternalUsers -ExternalTenantUser $IncludedExternalUser -UsersinTenant $UsersinTenant -B2BGuest $B2BGuest.Id -B2BMember $B2BMember.Id -LocalGuest $LocalGuest.Id -B2BDirectConnect $B2BDirectConnect
             }
-            $ExcludeUsers        = if($Policy.Conditions.Users.ExcludeUsers){$Policy.Conditions.Users.ExcludeUsers}
-            $ExcludeUsers       += if($Policy.Conditions.Users.ExcludeGroups){$Policy.Conditions.Users.ExcludeGroups | ForEach-Object { if ($Members = Get-MgBetaGroupMember -GroupId $_) { $Members.Id} if($Owner = Get-MgBetaGroupOwner -GroupId $_){$Owner.Id}}}
+            $ExcludeUsers         = if($Policy.Conditions.Users.ExcludeUsers){$Policy.Conditions.Users.ExcludeUsers}
+            $ExcludeUsers       += if($Policy.Conditions.Users.ExcludeGroups){$Policy.Conditions.Users.ExcludeGroups | ForEach-Object { if ($Members = Get-MgGroupMember -GroupId $_) { $Members.Id} if($Owner = Get-MgGroupOwner -GroupId $_){$Owner.Id}}}
             $ExcludeUsers       += Get-UserIdsByRole -Roles $Policy.Conditions.Users.ExcludeRoles -DirectoryRole $DirectoryRole
             $ExcludeUsers       += Process-ExternalUsers -ExternalTenantUser $ExcludedExternalUser -UsersinTenant $UsersinTenant -B2BGuest $B2BGuest.Id -B2BMember $B2BMember.Id -LocalGuest $LocalGuest.Id -B2BDirectConnect $B2BDirectConnect
             $ExcludeId          += $ExcludeUsers
             $IncludeId          += $IncludeUsers | Where-Object { $_ -notin $ExcludeUsers }
-            $UsersInPolicy[$Policy.DisplayName] += $IncludeUsers | Where-Object { $_ -notin $ExcludeUsers }             
+            
+            # Use Policy ID as the key for storing included users
+            $UsersInPolicy[$Policy.Id] += $IncludeUsers | Where-Object { $_ -notin $ExcludeUsers }
+            
+            # Map the Policy ID to the Policy Display Name
+            $PolicyDetails[$Policy.Id] = $Policy.DisplayName
+                      
             if ($Policy.GrantControls.AuthenticationStrength.RequirementsSatisfied -contains 'mfa') 
             {
                 $NotRegistered  += $IncludeUsers| Where-Object { $_ -notin $ExcludeUsers }
-                $CurrentPolicy   = $true 
-                $Strength        = $Policy.GrantControls.AuthenticationStrength.AllowedCombinations
+                $CurrentPolicy    = $true 
+                $Strength         = $Policy.GrantControls.AuthenticationStrength.AllowedCombinations
                 foreach ($IncludeUser in $IncludeUsers) 
                 {
-                    $UserAuthDetails   = $UserAuthenticationDetail | Where-Object { $_.Id -eq $IncludeUser }
+                    $UserAuthDetails    = $UserAuthenticationDetail | Where-Object { $_.Id -eq $IncludeUser }
                     $MethodsRegistered = if ($UserAuthDetails.MethodsRegistered -ne $null) { $UserAuthDetails.MethodsRegistered -split ',' } else {'None'}
                     foreach ($Method in $MethodsRegistered) 
                     {
@@ -324,10 +336,10 @@ else
                                     $Registered += $IncludeUser -join','                       
                                 }
                             }
-                         }
+                        }
                     }
-                 }
-              }
+                }
+             }
               $Registered = $Registered | Select-Object -Unique 
               if(!$CurrentPolicy)
               {
@@ -340,30 +352,37 @@ else
 $ProcessedUserCount = 0
 $FilePath = ".\MFA_Deployment_Sources_Report_$((Get-Date -format 'yyyy-MMM-dd-ddd hh-mm tt').ToString()).csv"
 
-#Now starts the Process of Checking various conditions for the users
 foreach ($User in $MgUsers) 
 {
     $name  = @()
     $ProcessedUserCount++
     $percent = ($ProcessedUserCount/$TotalUser)*100
-    Write-Progress -Activity "`n    Processed user count: $ProcessedUserCount `n" -Status "Currently processing User: $($User.DisplayName)" -PercentComplete $percent
+    Write-Progress -Activity "`n     Processed user count: $ProcessedUserCount `n" -Status "Currently processing User: $($User.DisplayName)" -PercentComplete $percent
     $UserId = $User.Id
     $Peruser = (Invoke-MgGraphRequest -Method GET -Uri "/beta/users/$UserId/authentication/requirements").perUserMfaState 
     # Get user authentication details
-    $UserAuthDetails   = $UserAuthenticationDetail | Where-Object { $_.UserPrincipalName -eq $User.UserPrincipalName }
+    $UserAuthDetails    = $UserAuthenticationDetail | Where-Object { $_.UserPrincipalName -eq $User.UserPrincipalName }
     $MethodsRegistered = if ($UserAuthDetails.MethodsRegistered -ne "") { $UserAuthDetails.MethodsRegistered -join ',' } else { 'None' }
-    $Name   += foreach($Pol in $Policies.DisplayName){if($UsersInPolicy[$pol] -contains $user.Id){$Pol}}
-    $PolicyName = $Name -join','
+    
+    #Iterate over Policy IDs to find all assigned policies
+    foreach ($PolicyId in $UsersInPolicy.Keys) {
+        if ($UsersInPolicy[$PolicyId] -contains $User.Id) {
+            # Retrieve the policy name using the unique ID
+            $name += $PolicyDetails[$PolicyId]
+        }
+    }
+    $PolicyName = $name -join ','
+    
     $MFAEnforce = @{
-        'User Display Name'         = $User.DisplayName
-        'User Principal Name'       = $User.UserPrincipalName
-        'MFA Enforced Via'          =  if($PerUser -eq 'Enforced' -and $PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Per User MFA , Conditional Access Policy'} 
-                                        elseif ( $PerUser -eq 'Enforced' -and $SecurityDefault -eq $true) { 'Per User MFA , Security Default' } 
-                                        elseif ($PerUser -eq 'Enforced') { 'Per User MFA' } 
-                                        elseif ($SecurityDefault -eq $true) { 'Security Default' } 
-                                        elseif ($PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Conditional Access Policy'}
-                                        elseif ($User.AccountEnabled -eq $false) {'SignIn Blocked'}
-                                        else {'Disabled'}
+        'User Display Name'          = $User.DisplayName
+        'User Principal Name'        = $User.UserPrincipalName
+        'MFA Enforced Via'           =  if($PerUser -eq 'Enforced' -and $PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Per User MFA , Conditional Access Policy'} 
+                                            elseif ( $PerUser -eq 'Enforced' -and $SecurityDefault -eq $true) { 'Per User MFA , Security Default' } 
+                                            elseif ($PerUser -eq 'Enforced') { 'Per User MFA' } 
+                                            elseif ($SecurityDefault -eq $true) { 'Security Default' } 
+                                            elseif ($PolicySetting -eq 'True' -and $IncludedUsers -contains $User.Id){'Conditional Access Policy'}
+                                            elseif ($User.AccountEnabled -eq $false) {'SignIn Blocked'}
+                                            else {'Disabled'}
         'Is Registered MFA Supported in CA' = if($IncludedUsers -contains $User.Id){if($UserAuthDetails.IsMFARegistered -contains 'True'){if($PolicySetting -eq 'True' -and  $NotRegistered -notcontains $User.Id) {'True'}elseif($Registered -contains $User.Id){'True'}else{'False'}}else{'False'}}else{''}
         'CA MFA Status'              = if($IncludedUsers -contains $User.Id){'Enabled'}else{'Disabled'}
         'Assigned CA Policy'         = if($IncludedUsers -contains $User.Id){$PolicyName}else{''}
@@ -379,7 +398,7 @@ foreach ($User in $MgUsers)
         $MFAEnforced | Select-Object 'User Display Name','User Principal Name','MFA Registered','Methods Registered','MFA Enforced Via','Per User MFA Status','Security Default Status','CA MFA Status','Assigned CA Policy','Is Registered MFA Supported in CA' | Export-Csv -Path $FilePath -NoTypeInformation -Append
     }
     catch
-    {       
+    {        
         Write-Host "Error occurred While Exporting: $_" -ForegroundColor Red
     }
 }
@@ -391,7 +410,7 @@ Disconnect-MgGraph | Out-Null
 if((Test-Path -Path $FilePath) -eq "True")
 {
     Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to access 3,000+ reports and 450+ management actions across your Microsoft 365 environment. ~~" -ForegroundColor Green `n
     Write-Host "Exported report has $ProcessedUserCount user(s)" 
     $Prompt = New-Object -ComObject wscript.shell
     $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File",4)
