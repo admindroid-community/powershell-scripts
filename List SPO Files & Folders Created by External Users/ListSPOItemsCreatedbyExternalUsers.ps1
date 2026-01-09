@@ -1,7 +1,7 @@
 <#
 =============================================================================================
-Name: Get SharePoint Files & Folders Created By External Users Using PowerShell
-Version: 1.0
+Name:    Get SharePoint Files & Folders Created By External Users Using PowerShell
+Version: 2.0
 Website: o365reports.com
 
 ~~~~~~~~~~~~~~~~~~
@@ -17,6 +17,12 @@ Script Highlights:
 8. Exports the report results to a CSV file.
 
 For detailed script execution: https://o365reports.com/2024/06/11/get-sharepoint-files-folders-created-by-external-users-using-powershell/
+
+~~~~~~~~~
+Change Log:
+~~~~~~~~~
+  V1.0 (Jun 11, 2024) - File created
+  V2.0 (Dec 29, 2025) - Handled ClientId requirement for SharePoint PnP PowerShell module and made minor usability changes
 
 =============================================================================================
 #>
@@ -37,65 +43,53 @@ param
 )
 
 #Check for SharePoint PnPPowerShellOnline module availability
-$PnPOnline = (Get-Module PnP.PowerShell -ListAvailable).Name
-if($PnPOnline -eq $null)
-{ 
-  Write-Host "Important: SharePoint PnP PowerShell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No  
-  if($Confirm -match "[yY]")
+Function Installation-Module
+{
+ $Module = Get-InstalledModule -Name PnP.PowerShell -MinimumVersion 1.12.0 -ErrorAction SilentlyContinue
+ If($Module -eq $null)
+ {
+  Write-Host SharePoint PnP PowerShell Module is not available -ForegroundColor Yellow
+  $Confirm = Read-Host Are you sure you want to install module? [Yy] Yes [Nn] No
+  If($Confirm -match "[yY]") 
   { 
-    Write-Host "Installing SharePoint PnP PowerShell module..." -ForegroundColor Magenta
-    Install-Module PnP.Powershell -Repository PsGallery -Force -AllowClobber -Scope CurrentUser
-    Import-Module PnP.Powershell -Force
-    #Register a new Azure AD Application and Grant Access to the tenant
-    Register-PnPManagementShellAccess
+   Write-Host "Installing PnP PowerShell module..."
+   Install-Module PnP.PowerShell -Force -AllowClobber -Scope CurrentUser
+   Import-Module -Name Pnp.Powershell        
   } 
-  else
+  Else
   { 
-    Write-Host "Exiting. `nNote: SharePoint PnP PowerShell module must be available in your system to run the script" 
-    Exit 
-  }  
+   Write-Host "PnP PowerShell module is required to connect SharePoint Online.Please install module using 'Install-Module PnP.PowerShell' cmdlet." 
+   Exit
+  }
+ }
+ Write-Host `nConnecting to SharePoint Online...   
 }
 
-#Connecting to  SharePoint PnPPowerShellOnline module.......
-Write-Host "Connecting to SharePoint PnPPowerShellOnline module..." -ForegroundColor Cyan
-function Connect_Sharepoint
+
+#SPO Site connection 
+Function Connection-Module
 {
-    param
-    (
-        [Parameter(Mandatory = $true)]
-        [String] $Url
-    )
-    try
-    {
-        if(($UserName -ne "") -and ($Password -ne "") -and ($TenantName -ne ""))
-        {
-            $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
-            $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-            Connect-PnPOnline -Url $Url -Credential $Credential
-        }
-        elseif($TenantName -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
-        {
-            Connect-PnPOnline -Url $Url -ClientId $ClientId -Thumbprint $CertificateThumbprint  -Tenant "$TenantName.onmicrosoft.com" 
-        }
-        else
-        {
-            Connect-PnPOnline -Url $Url -Interactive    
-        }
-    }
-    catch
-    {
-        Write-Host "Error occured $($Url) : $_.Exception.Message"   -Foreground Red;
-    }
-}
-if($TenantName -eq "")
-{
-    $TenantName = Read-Host "Enter your Tenant Name to Connect SharePoint Online  (Example : If your tenant name is 'contoso.com', then enter 'contoso' as a tenant name )  "
+ param
+ (
+  [Parameter(Mandatory = $true)]
+  [String] $Url
+ )
+ if(($AdminName -ne "") -and ($Password -ne "") -and ($ClientId -ne ""))
+ {
+  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
+  $Credential  = New-Object System.Management.Automation.PSCredential $AdminName,$SecuredPassword
+  Connect-PnPOnline -Url $Url -Credential $Credential -ClientId $ClientId
+ }
+ elseif($TenantName -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
+ {
+  Connect-PnPOnline -Url $Url -ClientId $ClientId -Thumbprint $CertificateThumbprint  -Tenant "$TenantName.onmicrosoft.com" 
+ }
+ else
+ {
+  Connect-PnPOnline -Url $Url -Interactive -ClientId $ClientId
+ }
 }
 
-$AdminUrl = "https://$TenantName.sharepoint.com/"
-connect_sharepoint -Url $AdminUrl
-$OutputCSV = "./SPO - Files & Folders Created By External Users " + ((Get-Date -format "MMM-dd hh-mm-ss tt").ToString()) + ".csv"
 
 #Collecting the data and exporting it to a CSV file
 $global:Count = 0
@@ -114,7 +108,6 @@ function Export_Data
     #Checking the resource created by an external user
     if(($ExternalUserIds | where{($_.Id -eq $AuthorId )}).count -eq 1)
     {
-        $global:Count++
         $ExportResult =@{
             'File/Folder Name'  = $ListItem.FieldValues.FileLeafRef;
             'Relative URL' = $AdminUrl + $ListItem.FieldValues.FileRef;
@@ -127,6 +120,7 @@ function Export_Data
         $ExportResult = New-Object PSObject -Property $ExportResult
         #Export result to csv
         $ExportResult | Select-Object 'Site Name','Site Url','File/Folder Name','Created By','Resource Type','Created On','Relative URL' | Export-Csv -path $OutputCSV -Append -NoTypeInformation
+        $global:Count++
     } 
 }
 #Collecting items created by external users
@@ -172,7 +166,7 @@ function Get_ExternalUserItems
     }
     catch
     {
-        Write-Host "Error occured $($SiteUrl) : $_"   -Foreground Red;
+        Write-Host "Error occured $($SiteUrl): $($_.Exception.Message)" -Foreground Yellow
     }
 }
 
@@ -189,10 +183,25 @@ else
   $ObjectType = "All"
 }
 
+
+Installation-Module
+$timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+$OutputCSV = "$(Get-Location)\SPO_Files_&_Folders_Created_By_External_Users_$timestamp.csv"
+
+if($TenantName -eq "" -and $SiteAddress -eq "" -and $SitesCsv -eq "")
+{
+ $TenantName = Read-Host "Enter your Tenant Name to Connect SharePoint Online  (Example : If your tenant name is 'contoso.com', then enter 'contoso' as a tenant name )  "
+}
+
+if($ClientId -eq "")
+{
+ $ClientId= Read-Host "ClientId is required to connect PnP PowerShell. Enter ClientId"
+}
+
 #To Retrive Data From All Sites Present In The Tenant
 if($SiteAddress -ne "")
 {
-    Connect_Sharepoint -Url $SiteAddress 
+    Connection-Module -Url $SiteAddress 
     Get_ExternalUserItems -Objecttype $ObjectType -SiteUrl $SiteAddress
 }
 elseif($SitesCsv -ne "")
@@ -201,31 +210,43 @@ elseif($SitesCsv -ne "")
     {
         Import-Csv -path $SitesCsv | ForEach-Object{
             Write-Progress -activity "Processing $($_.SitesUrl)" 
-            Connect_Sharepoint -Url $_.SitesUrl 
+            Connection-Module -Url $_.SitesUrl 
             Get_ExternalUserItems -Objecttype $ObjectType -SiteUrl $_.SitesUrl
         }
     }
     catch
     {
-        Write-Host "Error occured : $_"   -Foreground Red;
+        $_.Exception.Message
     }
 }  
 #To retrive the data for site presesent in our admin center
 else
 {
-    Get-PnPTenantSite | Select Url,Title | ForEach-Object{
-        Write-Progress -activity "Processing $($_.Url)" 
-        Connect_Sharepoint -Url $_.Url 
-        Get_ExternalUserItems -Objecttype $ObjectType -SiteUrl $_.Url
+    try{
+        Connection-Module -Url "https://$TenantName-admin.sharepoint.com/"
+        Get-PnPTenantSite | Where -Property Template -NotIn ("SRCHCEN#0", "REDIRECTSITE#0", "SPSMSITEHOST#0", "APPCATALOG#0", "POINTPUBLISHINGHUB#0", "EDISC#0", "STS#-1") | ForEach-Object{
+            Write-Progress -activity "Processing $($_.Url)"
+            Connection-Module -Url $_.Url  
+            Get_ExternalUserItems -ObjectType $ObjectType -SiteUrl $_.Url
+        }
+    }
+    catch{
+        $_.Exception.Message
     }
 }
+
+
 #Open output file after execution
 if($Count -gt 0)
 {
     if((Test-Path -Path $OutputCSV) -eq "True")
     { 
+        Write-Host `nThe output file contains $Global:Count items
+        Write-Host "`n The Output file availble in: " -NoNewline -ForegroundColor Yellow; Write-Host $OutputCSV`n;
+        Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+        Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host "to access 3,000+ reports and 450+ management actions across your Microsoft 365 environment. ~~" -ForegroundColor Green `n`n
         $Prompt = New-Object -ComObject wscript.shell    
-        $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File", 4)  
+        $UserInput = $Prompt.popup("Do you want to open output file?",` 0,"Open Output File", 4)
         If ($UserInput -eq 6)    
         {
             Invoke-Item $OutputCSV  
@@ -237,4 +258,4 @@ else
     Write-Host "No records found"
 }
 #Disconnect the sharePoint PnPOnline module
-Disconnect-PnPOnline
+Disconnect-PnPOnline -WarningAction SilentlyContinue
