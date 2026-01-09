@@ -2,7 +2,7 @@
 =============================================================================================
 Name:           Connect to all the Microsoft services using PowerShell
 Description:    This script automatically installs all the required modules(upon your confirmation) and connects to the services
-Version:        4.1
+Version:        5.0
 Website:        o365reports.com
 
 Script Highlights:
@@ -23,10 +23,12 @@ Change Log:
 ~~~~~~~~~~~
 ~~~~~~~~~
   V1.0 (Nov 01, 2019) - File created
-  V2.0 (Jan 21, 2020)  - Added support for MS Online and SharePoint PnP PowerShell modules
-  V3.0 (Oct 06, 2023)  - Removed Skype for Business and minor usability changes
+  V2.0 (Jan 21, 2020) - Added support for MS Online and SharePoint PnP PowerShell modules
+  V3.0 (Oct 06, 2023) - Removed Skype for Business and minor usability changes
   V4.0 (Feb 29, 2024) - Added support for MS Graph and MS Graph beta PowerShell modules
   V4.1 (Apr 03, 2025) - Handled ClientId requirement for SharePoint PnP PowerShell module
+  V5.0 (Dec 26, 2025) - Removed MSOnline & AzureAD modules and added MS Entra module.
+                        Included CBA for SPOService module and made minor usability changes
   
 ============================================================================================
 #>
@@ -34,8 +36,8 @@ Param
 (
     [Parameter(Mandatory = $false)]
     [switch]$Disconnect,
-    [ValidateSet('MSGraph','MSGraphBeta','ExchangeOnline','SharePointOnline','SharePointPnP','SecAndCompCenter','MSTeams','MSOnline','AzureAD')]
-    [string[]]$Services=("ExchangeOnline",'MSTeams','SharePointOnline','SharePointPnP','SecAndCompCenter',"MSOnline","AzureAD",'MSGraph','MSGraphBeta'),
+    [ValidateSet('MSGraph','MSGraphBeta','ExchangeOnline','SharePointOnline','SharePointPnP','SecAndCompCenter','MSTeams','MSEntra')]
+    [string[]]$Services=("ExchangeOnline",'MSTeams','SharePointOnline','SharePointPnP','SecAndCompCenter','MSGraph','MSGraphBeta','MSEntra'),
     [string]$SharePointHostName,
     [Switch]$MFA,
     [Switch]$CBA,
@@ -59,9 +61,10 @@ if($Disconnect.IsPresent)
  Disconnect-PnPOnline -ErrorAction SilentlyContinue
  #Disconnect MS Graph PowerShell
  Disconnect-MgGraph -ErrorAction SilentlyContinue
+ #Disconnect MS Entra PowerShell
+ Disconnect-Entra -ErrorAction SilentlyContinue
  Write-Host All sessions in the current window has been removed. -ForegroundColor Yellow
 }
- 
 else
 {
  if(($UserName -ne "") -and ($Password -ne "")) 
@@ -76,7 +79,7 @@ else
  }
 
  $ConnectedServices=""
- if($Services.Length -eq 9)
+ if($Services.Length -eq 8)
  {
   $RequiredServices=$Services  
  }
@@ -94,7 +97,7 @@ else
    #Module and Connection settings for Exchange Online module
    ExchangeOnline
    {
-    $Module=Get-InstalledModule -Name ExchangeOnlineManagement
+    $Module=Get-InstalledModule -Name ExchangeOnlineManagement -ErrorAction SilentlyContinue
     if($Module.count -eq 0)
     {
      Write-Host Required Exchange Online PowerShell module is not available  -ForegroundColor yellow 
@@ -110,14 +113,15 @@ else
      }
      Continue
     }
-  
+
+    Import-Module ExchangeOnlineManagement
     if($CredentialPassed -eq $true)
     {
      Connect-ExchangeOnline -Credential $Credential -ShowBanner:$false
     }
     elseif($CBA -eq $true)
     {
-     Connect-ExchangeOnline -AppId $AppId -CertificateThumbprint $CertificateThumbprint  -Organization $TenantName -ShowBanner:$false
+     Connect-ExchangeOnline -AppId $AppId -CertificateThumbprint $CertificateThumbprint -Organization $TenantName -ShowBanner:$false
     }
     else
     {
@@ -133,104 +137,10 @@ else
     }
    }
 
-  #Module and Connection settings for AzureAD V1 (MSOnline module)
-   MSOnline
-   {
-    $Module=Get-Module -Name MSOnline -ListAvailable 
-    if($Module.count -eq 0)
-    {
-     Write-Host MSOnline module is not available  -ForegroundColor yellow 
-     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
-     if($Confirm -match "[yY]")
-     {
-      Install-Module MSOnline -Scope CurrentUser
-      Import-Module MSOnline
-     }
-     else
-     {
-      Write-Host MSOnline module is required to connect AzureAD.Please install module using Install-Module MSOnline cmdlet.
-     }
-     Continue
-    }
-
-    if($CredentialPassed -eq $true)
-    {
-     Connect-MsolService -Credential $Credential
-    }
-    elseif($CBA -eq $true)
-    {
-     Write-Host "MSonline module doesn't support certificate based authentication. Please enter the credential in the prompt"
-     Connect-MsolService
-    }
-    else
-    {
-     Connect-MsolService
-    }
-    If((Get-MsolUser -MaxResults 1) -ne $null)
-    {
-     if($ConnectedServices -ne "")
-     {
-      $ConnectedServices=$ConnectedServices+","
-     }
-     $ConnectedServices=$ConnectedServices+" MSOnline"
-    }
-    if(($RequiredServices -contains "SharePoint") -eq "true")
-     {
-      $SharePointHostName=((Get-MsolDomain) | where {$_.IsInitial -eq "True"} ).name -split ".onmicrosoft.com"
-      $SharePointHostName=($SharePointHostName).trim()
-     }
-   }
-
-
-
-   #Module and Connection settings for AzureAD V2 (AzureAD module)
-   AzureAD
-   {
-    $Module=Get-Module -Name AzureAD -ListAvailable 
-    if($Module.count -eq 0)
-    {
-     Write-Host AzureAD module is not available  -ForegroundColor yellow 
-     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
-     if($Confirm -match "[yY]")
-     {
-      Install-Module AzureAD -Scope CurrentUser
-      Import-Module AzureAD
-     }
-     else
-     {
-      Write-Host AzureAD module is required to connect AzureAD.Please install module using Install-Module AzureAD cmdlet.
-     }
-     Continue
-    }
-    
-    if($CredentialPassed -eq $true)
-    {
-     $AzureAD=Connect-AzureAD -Credential $Credential
-    }
-    elseif($CBA -eq $true)
-    {
-     $AzureAD=Connect-AzureAD -ApplicationId $AppId -TenantId $TenantId -CertificateThumbprint $CertificateThumbprint
-    }
-    else
-    {
-     $AzureAD=Connect-AzureAD
-    }
-
-    #Check for Azure AD connectivity
-    If($AzureAD -ne $null)
-    {
-     if($ConnectedServices -ne "")
-     {
-      $ConnectedServices=$ConnectedServices+","
-     }
-     $ConnectedServices=$ConnectedServices+" Azure AD"
-    }
-   }
-
    #Module and Connection settings for SharePoint Online module
    SharePointOnline
    {
-    $Module=Get-Module -Name Microsoft.Online.SharePoint.PowerShell -ListAvailable 
+    $Module=Get-InstalledModule -Name Microsoft.Online.SharePoint.PowerShell -ErrorAction SilentlyContinue
     if($Module.count -eq 0)
     {
      Write-Host SharePoint Online PowerShell module is not available  -ForegroundColor yellow 
@@ -238,7 +148,7 @@ else
      if($Confirm -match "[yY]")
      {
       Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser
-      Import-Module Microsoft.Online.SharePoint.PowerShell -DisableNameChecking
+      Import-Module Microsoft.Online.SharePoint.PowerShell -UseWindowsPowerShell -DisableNameChecking
      }
      else
      {
@@ -246,21 +156,22 @@ else
       Continue
      }
     }
+
+    Import-Module Microsoft.Online.SharePoint.PowerShell -UseWindowsPowerShell -DisableNameChecking -WarningAction SilentlyContinue
     if(!($PSBoundParameters['SharePointHostName']) -and ([string]$SharePointHostName -eq "") ) 
     {
      Write-Host SharePoint organization name is required.`nEg: Contoso for admin@Contoso.Onmicrosoft.com -ForegroundColor Yellow
-     $SharePointHostName= Read-Host "Please enter SharePoint organization name"  
+     $SharePointHostName = Read-Host "Please enter SharePoint organization name"  
     }
 
     if($CredentialPassed -eq $true)
     {
-     Import-Module Microsoft.Online.SharePoint.PowerShell -DisableNameChecking
      Connect-SPOService -Url https://$SharePointHostName-admin.sharepoint.com -credential $credential
     } 
     elseif($CBA -eq $true)
     {
-     Write-Host "SharePoint Online PowerShell module doesn't support certificate based authentication. Please enter credential in the prompt"
-     Connect-SPOService -Url https://$SharePointHostName-admin.sharepoint.com
+     $Cert = Get-ChildItem Cert:\CurrentUser\My\$CertificateThumbprint
+     Connect-SPOService -Url https://$SharePointHostName-admin.sharepoint.com -ClientId $AppId -Tenant $TenantName -Certificate $Cert
     }
     else
     {
@@ -276,25 +187,28 @@ else
     }
    }
 
+
    #Module and Connection settings for Sharepoint PnP module
    SharePointPnP
    {
-    $Module=Get-InstalledModule -Name SharePointPnPPowerShellOnline
+    $Module=Get-InstalledModule -Name PnP.PowerShell -ErrorAction SilentlyContinue
     if($Module.count -eq 0)
     {
      Write-Host SharePoint PnP module module is not available  -ForegroundColor yellow 
      $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No
      if($Confirm -match "[yY]")
      {
-      Install-Module -Name SharePointPnPPowerShellOnline -AllowClobber -Scope CurrentUser
-      Import-Module SharepointpnpPowerShellOnline -DisableNameChecking
+      Install-Module -Name PnP.PowerShell -AllowClobber -Scope CurrentUser
+      Import-Module PnP.PowerShell -DisableNameChecking
      }
      else
      {
-      Write-Host SharePoint Pnp module is required.Please install module using Install-Module SharePointPnPPowerShellOnline cmdlet.
+      Write-Host SharePoint Pnp module is required.Please install module using Install-Module PnP.PowerShell cmdlet.
      }
      Continue
     }
+
+    Import-Module PnP.PowerShell -DisableNameChecking
     if(!($PSBoundParameters['SharePointHostName']) -and ([string]$SharePointHostName -eq "") ) 
     {
      Write-Host SharePoint organization name is required.`nEg: Contoso for admin@Contoso.com -ForegroundColor Yellow
@@ -338,7 +252,7 @@ else
    #Module and Connection settings for Security & Compliance center
    SecAndCompCenter
    {
-    $Module=Get-InstalledModule -Name ExchangeOnlineManagement
+    $Module=Get-InstalledModule -Name ExchangeOnlineManagement -ErrorAction SilentlyContinue
     if($Module.count -eq 0)
     {
      Write-Host Exchange Online PowerShell module is not available  -ForegroundColor yellow 
@@ -354,7 +268,8 @@ else
      }
      Continue
     }
- 
+
+    Import-Module ExchangeOnlineManagement
     if($CredentialPassed -eq $true)
     {
      Connect-IPPSSession -Credential $Credential -ShowBanner:$false
@@ -386,7 +301,7 @@ else
    #Module and Connection settings for Teams Online module
   MSTeams
    {
-    $Module=Get-InstalledModule -Name MicrosoftTeams -MinimumVersion 4.0.0 
+    $Module=Get-InstalledModule -Name MicrosoftTeams -ErrorAction SilentlyContinue
     if($Module.count -eq 0)
     {
      Write-Host Required MicrosoftTeams module is not available  -ForegroundColor yellow 
@@ -394,7 +309,7 @@ else
      if($Confirm -match "[yY]")
      {
       Install-Module MicrosoftTeams -AllowClobber -Force -Scope CurrentUser
-      Import-Module MicrosoftTeams
+      Import-Module MicrosoftTeams -DisableNameChecking
      }
      else
      {
@@ -403,6 +318,7 @@ else
      Continue
     }
 
+    Import-Module MicrosoftTeams -DisableNameChecking
     if($CredentialPassed -eq $true)
     {
      $Teams=Connect-MicrosoftTeams -Credential $Credential
@@ -431,7 +347,7 @@ else
   MSGraph
    {
     #Check for module installation
-    $Module=Get-Module -Name microsoft.graph -ListAvailable
+    $Module=Get-InstalledModule -Name microsoft.graph -ErrorAction SilentlyContinue
     if($Module.count -eq 0) 
     { 
      Write-Host Microsoft Graph PowerShell SDK is not available  -ForegroundColor yellow  
@@ -440,7 +356,7 @@ else
      { 
       Write-host "Installing Microsoft Graph PowerShell module..."
       Install-Module Microsoft.Graph -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
-      Import-Module Microsoft.Graph.Users
+      Import-Module Microsoft.Graph.Users -DisableNameChecking
      }
      else
      {
@@ -449,6 +365,7 @@ else
      Continue
     }
     
+    Import-Module Microsoft.Graph.Users -DisableNameChecking
     if($CredentialPassed -eq $true)
     {
      Write-Host "MS Graph doesn't support passing credential as parameters. Please enter the credential in the prompt."
@@ -479,7 +396,7 @@ else
   MSGraphBeta
    {
     #Check for module installation
-    $Module=Get-Module -Name microsoft.graph.beta -ListAvailable
+    $Module=Get-InstalledModule -Name microsoft.graph.beta -ErrorAction SilentlyContinue
     if($Module.count -eq 0) 
     { 
      Write-Host Microsoft Graph Beta PowerShell SDK is not available  -ForegroundColor yellow  
@@ -488,7 +405,7 @@ else
      { 
       Write-host "Installing Microsoft Graph Beta PowerShell module..."
       Install-Module Microsoft.Graph.Beta -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
-      Import-Module Microsoft.Graph.Beta.Users
+      Import-Module Microsoft.Graph.Beta.Users -DisableNameChecking
      }
      else
      {
@@ -496,7 +413,8 @@ else
      }
      Continue
     }
-   
+
+    Import-Module Microsoft.Graph.Beta.Users -DisableNameChecking
     if($CredentialPassed -eq $true)
     {
      Write-Host "MS Graph Beta doesn't support passing credential as parameters. Please enter the credential in the prompt."
@@ -522,14 +440,63 @@ else
      
     }
    }
+
+   #Module and connection settings for MS Entra PowerShell
+   MSEntra
+   {
+    #Check for module installation
+    $Module=Get-InstalledModule -Name Microsoft.Entra -ErrorAction SilentlyContinue
+    if($Module.count -eq 0) 
+    { 
+     Write-Host Microsoft Entra PowerShell module is not available  -ForegroundColor yellow  
+     $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
+     if($Confirm -match "[yY]") 
+     { 
+      Write-host "Installing Microsoft Entra PowerShell module..."
+      Install-Module Microsoft.Entra -Repository PSGallery -Scope CurrentUser -AllowClobber -Force
+      Import-Module Microsoft.Entra.Users -DisableNameChecking
+     }
+     else
+     {
+      Write-Host "Microsoft Entra PowerShell module is required. Please install module using 'Install-Module Microsoft.Entra' cmdlet." 
+     }
+     Continue
+    }
+    
+    Import-Module Microsoft.Entra.Users -DisableNameChecking
+    if($CredentialPassed -eq $true)
+    {
+     Write-Host "MS Entra doesn't support passing credential as parameters. Please enter the credential in the prompt."
+     Connect-Entra -NoWelcome
+    }
+    elseif($CBA -eq $true)
+    {
+     Connect-Entra -ApplicationId $AppId -TenantId $TenantId -CertificateThumbPrint $CertificateThumbprint -NoWelcome
+    }
+    else
+    {
+     Connect-Entra -NoWelcome
+    }
+
+    #Check for MS Entra connectivity
+    If((Get-EntraUser -Top 1) -ne $null)
+    {
+     if($ConnectedServices -ne "")
+     {
+      $ConnectedServices=$ConnectedServices+","
+     }
+     $ConnectedServices=$ConnectedServices+" MS Entra"
+    }
+   }
   }
  }
+
  if($ConnectedServices -eq "")
  {
   $ConnectedServices="-"
  }
  Write-Host `n`nConnected Services - $ConnectedServices -ForegroundColor Cyan
  Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
- Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+ Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to access 3,000+ reports and 450+ management actions across your Microsoft 365 environment. ~~" -ForegroundColor Green `n`n
 }
 
