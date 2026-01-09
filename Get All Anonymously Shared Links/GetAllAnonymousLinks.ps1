@@ -32,6 +32,7 @@ Change Log:
 ~~~~~~~~~~~
 V1.0 (Apr 25, 2025) – File created.  
 V1.1 (Sep 09, 2025) – Added the function call to install PnP PowerShell module.
+v1.2 (Jan 09, 2026) - Minor error message update.
 
 
 For detailed script execution: https://o365reports.com/2025/04/22/get-all-anonymous-links-in-sharepoint-online-using-powershell
@@ -102,6 +103,7 @@ Function Connection-Module
 
 Function Get-SharedLinks
 {
+try{
  $ExcludedLists = @("Form Templates","Style Library","Site Assets","Site Pages", "Preservation Hold Library", "Pages", "Images",
                        "Site Collection Documents", "Site Collection Images")
  $DocumentLibraries = Get-PnPList | Where-Object {$_.Hidden -eq $False -and $_.Title -notin $ExcludedLists -and $_.BaseType -eq "DocumentLibrary"} # -ErrorAction SilentlyContinue 
@@ -222,6 +224,10 @@ Function Get-SharedLinks
   }
  }
 }
+catch{
+    Write-Host "$($_.Exception.Message)" -ForegroundColor Yellow
+}
+}
 
 $TimeStamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 $ReportOutput = "$PSScriptRoot\AnonymousLink_Report_ $TimeStamp.csv"
@@ -250,7 +256,7 @@ If($ImportCsv -ne "")
     Get-SharedLinks
   }
   catch{
-    Write-Host "You don't have access to this site : $SiteUrl" -ForegroundColor Yellow
+    Write-Host "$($_.Exception.Message)" -ForegroundColor Yellow
   } 
  }
  Disconnect-PnPOnline -WarningAction SilentlyContinue
@@ -268,7 +274,7 @@ Else
          Get-SharedLinks
     }
     catch {
-         Write-Host "You don't have access to this site : $($Site.Url)" -ForegroundColor Yellow
+         Write-Host "$($_.Exception.Message)" -ForegroundColor Yellow
     }
  }
  Disconnect-PnPOnline -WarningAction SilentlyContinue
