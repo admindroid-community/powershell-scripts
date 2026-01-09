@@ -1,7 +1,7 @@
 <#
 =============================================================================================
 Name:         Export SharePoint Online File Version History Report Using PowerShell    
-Version:      1.0
+Version:      2.0
 website:      o365reports.com
 
 ~~~~~~~~~~~~~~~~~~
@@ -19,6 +19,13 @@ Script Highlights:
 10. It can be executed with certificate-based authentication (CBA) too. 
 
 For detailed Script execution: https://o365reports.com/2024/06/20/export-sharepoint-online-file-version-history-report-using-powershell/
+
+~~~~~~~~~
+Change Log:
+~~~~~~~~~
+  V1.0 (Jun 20, 2024) - File created
+  V2.0 (Dec 29, 2025) - Handled ClientId requirement for SharePoint PnP PowerShell module and made minor usability changes
+
 ============================================================================================
 #>
 Param
@@ -26,9 +33,9 @@ Param
     [Parameter(Mandatory = $false)]
     [string]$AdminName,
     [string]$Password,
-    [String] $ClientId,
-    [String] $CertificateThumbprint,
-    [String] $TenantName,
+    [String]$ClientId,
+    [String]$CertificateThumbprint,
+    [String]$TenantName,
     [string]$SiteUrl,
     [int]$VersionCount = -1,
     [string]$ImportCsv,
@@ -36,23 +43,29 @@ Param
     [ValidateSet('GB', 'MB', 'KB', 'B')]
     [string]$Unit
 )
-Function Installation-Module{
-    $Module = Get-InstalledModule -Name PnP.PowerShell -RequiredVersion 1.12.0 -ErrorAction SilentlyContinue
-    If($Module -eq $null){
-        Write-Host PnP PowerShell Module is not available -ForegroundColor Yellow
-        $Confirm = Read-Host Are you sure you want to install module? [Yy] Yes [Nn] No
-        If($Confirm -match "[yY]") { 
-            Write-Host "Installing PnP PowerShell module..."
-            Install-Module PnP.PowerShell -RequiredVersion 1.12.0 -Force -AllowClobber -Scope CurrentUser
-            Import-Module -Name Pnp.Powershell -RequiredVersion 1.12.0           
-        } 
-        Else{ 
-           Write-Host PnP PowerShell module is required to connect SharePoint Online.Please install module using Install-Module PnP.PowerShell cmdlet. 
-           Exit
-        }
-    }
-    Write-Host `nConnecting to SharePoint Online...
-} 
+
+#Check for SharePoint PnPPowerShellOnline module availability
+Function Installation-Module
+{
+ $Module = Get-InstalledModule -Name PnP.PowerShell -MinimumVersion 1.12.0 -ErrorAction SilentlyContinue
+ If($Module -eq $null)
+ {
+  Write-Host SharePoint PnP PowerShell Module is not available -ForegroundColor Yellow
+  $Confirm = Read-Host Are you sure you want to install module? [Yy] Yes [Nn] No
+  If($Confirm -match "[yY]") 
+  { 
+   Write-Host "Installing PnP PowerShell module..."
+   Install-Module PnP.PowerShell -Force -AllowClobber -Scope CurrentUser
+   Import-Module -Name Pnp.Powershell        
+  } 
+  Else
+  { 
+   Write-Host "PnP PowerShell module is required to connect SharePoint Online.Please install module using 'Install-Module PnP.PowerShell' cmdlet."
+   Exit
+  }
+ }
+ Write-Host `nConnecting to SharePoint Online...   
+}
 
 
 Function Connection-Module{
@@ -65,7 +78,7 @@ Function Connection-Module{
     {
         $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
         $Credential  = New-Object System.Management.Automation.PSCredential $AdminName,$SecuredPassword
-        Connect-PnPOnline -Url $Url -Credential $Credential
+        Connect-PnPOnline -Url $Url -ClientId $ClientId -Credential $Credential
     }
     elseif($TenantName -ne "" -and $ClientId -ne "" -and $CertificateThumbprint -ne "")
     {
@@ -73,10 +86,12 @@ Function Connection-Module{
     }
     else
     {
-        Connect-PnPOnline -Url $Url -interactive
+        Connect-PnPOnline -Url $Url -ClientId $ClientId -interactive
            
     }
 }
+
+
 Function Convert-Bytes {
     $Bytes = switch ($Unit.ToUpper()) {
         'GB' { 1GB }
@@ -90,6 +105,8 @@ Function Convert-Bytes {
     }
     return $Bytes
 }
+
+
 Function HumanReadableByteSize ($Size) {
     Switch ($Size) {
 	{$_ -gt 1TB} {$Size = ($Size / 1TB).ToString("n2") + " TB";break}
@@ -100,8 +117,9 @@ Function HumanReadableByteSize ($Size) {
 	}
 Return $Size
 }
+
+
 Function Store-FileVersionInformation($FileItem){
-     write-host $fileItem.FieldValues.FileRef -f Green
     If($Versions.Count -ge $VersionCount){
         $VersionSize = $Versions | Measure-Object -Property Size -Sum | Select-Object -expand Sum
         $VersionSize = [Math]::Round(($VersionSize/$bytes),2)
@@ -109,7 +127,7 @@ Function Store-FileVersionInformation($FileItem){
         $TotalFileSize = $FileSize + $VersionSize
 
         $FileVersionData =  [PSCustomObject][Ordered]@{
-            "Site" = $Site
+            "Site Name" = $Site
             "Library" = $List.Title
             "File Name"  = $FileItem.FieldValues.FileLeafRef
             "File URL" = $File.ServerRelativeUrl
@@ -132,12 +150,14 @@ Function Store-FileVersionInformation($FileItem){
         $Global:ItemCount++
     }        
 }
+
+
 Function Get-SiteFileVersion($DocumentLibraries){
     ForEach($List in $DocumentLibraries)
     {
         $Files = Get-PnPListItem -List $List -PageSize 2000 -Fields File_x0020_Size, FileRef, Author | Where {$_.FileSystemObjectType -eq "File"}
         Foreach($FileItem in $Files){
-            Write-Progress -Activity ("Site : "+$Site +" | List : "+$List.Title) -Status ("Processing Item: "+$FileItem.FieldValues.FileLeafRef)
+            Write-Progress -Activity ("Site Name: "+$Site +" | List : "+$List.Title) -Status ("Processing Item: "+$FileItem.FieldValues.FileLeafRef)
             $File = Get-PnPProperty -ClientObject $FileItem  -Property File
             $Versions = Get-PnPProperty -ClientObject $File -Property Versions
             If($UserId -ne "" -and $UserId -eq $FileItem.FieldValues.Author.Email){
@@ -159,47 +179,58 @@ else{
     $Bytes = 1MB
     $Unit = "MB"
 }
-Installation-Module
 
+
+Installation-Module
 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$ReportOutput = "$PSScriptRoot\SPO File Version History Report $timestamp.csv"
+$ReportOutput = "$(Get-Location)\SPO_File_Version_History_Report_$timestamp.csv"
 $Global:ItemCount = 0
+
+if($ClientId -eq "")
+{
+ $ClientId= Read-Host "ClientId is required to connect PnP PowerShell. Enter ClientId"
+}
 
 If($ImportCsv -ne ""){
     $ListOfSites = Import-csv -Path $ImportCsv 
     Foreach($Site in $ListOfSites){
-        Connection-Module -Url $Site.SiteUrl
-        $Site = (Get-PnPWeb | Select Title).Title
-        $ExcludedLists = @("Form Templates","Style Library","Site Assets","Site Pages", "Preservation Hold Library", "Pages", "Images",
-                   "Site Collection Documents", "Site Collection Images")
-        $DocumentLibraries = Get-PnPList | Where-Object {$_.Hidden -eq $False -and $_.Title -notin $ExcludedLists -and $_.BaseType -eq "DocumentLibrary"}
-        Get-SiteFileVersion $DocumentLibraries
-        Disconnect-PnPOnline
+        try{
+            Connection-Module -Url $Site.SiteUrl
+            $Site = (Get-PnPWeb | Select Title).Title
+            $ExcludedLists = @("Form Templates","Style Library","Site Assets","Site Pages", "Preservation Hold Library", "Pages", "Images",
+                       "Site Collection Documents", "Site Collection Images")
+            $DocumentLibraries = Get-PnPList | Where-Object {$_.Hidden -eq $False -and $_.Title -notin $ExcludedLists -and $_.BaseType -eq "DocumentLibrary"}
+            Get-SiteFileVersion $DocumentLibraries
+        }
+        catch{
+            Write-Host "Error occured $($SiteUrl): $($_.Exception.Message)" -Foreground Yellow
+        }
     }
-
+    Disconnect-PnPOnline -WarningAction SilentlyContinue
 }
 Else{
     If($SiteUrl -eq ""){
         $SiteUrl = Read-Host "Site Url " 
     }
-
-    Connection-Module -Url $SiteUrl
-    $Site = (Get-PnPWeb | Select Title).Title 
-    $ExcludedLists = @("Form Templates","Style Library","Site Assets","Site Pages", "Preservation Hold Library", "Pages", "Images",
-                       "Site Collection Documents", "Site Collection Images")
-    $DocumentLibraries = Get-PnPList | Where-Object {$_.Hidden -eq $False -and $_.Title -notin $ExcludedLists -and $_.BaseType -eq "DocumentLibrary"}
-    Get-SiteFileVersion $DocumentLibraries
-    Disconnect-PnPOnline
+    try{
+        Connection-Module -Url $SiteUrl
+        $Site = (Get-PnPWeb | Select Title).Title 
+        $ExcludedLists = @("Form Templates","Style Library","Site Assets","Site Pages", "Preservation Hold Library", "Pages", "Images",
+                           "Site Collection Documents", "Site Collection Images")
+        $DocumentLibraries = Get-PnPList | Where-Object {$_.Hidden -eq $False -and $_.Title -notin $ExcludedLists -and $_.BaseType -eq "DocumentLibrary"}
+        Get-SiteFileVersion $DocumentLibraries
+        Disconnect-PnPOnline -WarningAction SilentlyContinue
+    }
+    catch{
+        Write-Host "Error occured $($SiteUrl): $($_.Exception.Message)" -Foreground Yellow
+    }
 }
 
 
 if((Test-Path -Path $ReportOutput) -eq "True") 
 {
-    Write-Host `nThe output file contains $Global:ItemCount files
-    Write-Host `n The Output file availble in: -NoNewline -ForegroundColor Yellow
-    Write-Host $OutputCSV 
-    Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+    Write-Host `nThe output file contains $Global:ItemCount records
+    Write-Host `n The Output file availble in: $ReportOutput -NoNewline -ForegroundColor Yellow
     $Prompt = New-Object -ComObject wscript.shell   
     $UserInput = $Prompt.popup("Do you want to open output file?",`   
     0,"Open Output File",4)   
@@ -212,4 +243,6 @@ else{
     Write-Host -f Yellow "No Records Found"
 }
 
-
+Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline;
+Write-Host "to access 3,000+ reports and 450+ management actions across your Microsoft 365 environment. ~~" -ForegroundColor Green `n`n
