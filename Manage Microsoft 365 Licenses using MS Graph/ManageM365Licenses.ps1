@@ -1,4 +1,4 @@
-﻿<#
+<#
 =============================================================================================
 Name:           Manage Microsoft 365 licenses using MS Graph PowerShell
 Description:    This script can perform 10+ Office 365 reporting and management activities
@@ -9,8 +9,8 @@ Script Highlights :
 
 1.	The script uses MS Graph PowerShell module.
 2.	Generates 5 Office 365 license reports.
-3.	Allows you to perform 6 license management actions that include adding or removing licenses in bulk.
-4.	License Name is shown with its friendly name like ‘Office 365 Enterprise E3’ rather than ‘ENTERPRISEPACK’.
+3.	Allows you to perform 7 license management actions that include adding or removing licenses in bulk.
+4.	License Name is shown with its friendly name like 'Office 365 Enterprise E3' rather than 'ENTERPRISEPACK'.
 5.	Automatically installs MS Graph PowerShell module (if not installed already) upon your confirmation.
 6.	The script can be executed with an MFA enabled account too.
 7.	Exports the report result to CSV.
@@ -24,6 +24,7 @@ Change Log
   V2.1 (Mar 21, 2025)  - Feature break due to module upgrade fixed.
   V2.2 (Mar 26, 2025) - Used 'Property' param to retrive user properties.
   V2.3 (Apr 05, 2025) - Updated license friednly name with latest changes and converted it as CSV file
+  V3.0 (Apr 18, 2026) - Added action to remove a specific license from users listed in a CSV.
 
 
 For detailed Script execution: https://o365reports.com/2022/09/08/manage-365-licenses-using-ms-graph-powershell
@@ -41,20 +42,20 @@ Param
 function Connect_MgGraph {
     $MsGraphBetaModule =  Get-Module Microsoft.Graph -ListAvailable
     if($MsGraphBetaModule -eq $null)
-    { 
-        Write-host "Important: Microsoft Graph PowerShell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully." 
-        $confirm = Read-Host Are you sure you want to install Microsoft Graph PowerShell module? [Y] Yes [N] No  
-        if($confirm -match "[yY]") 
-        { 
+    {
+        Write-host "Important: Microsoft Graph PowerShell module is unavailable. It is mandatory to have this module installed in the system to run the script successfully."
+        $confirm = Read-Host Are you sure you want to install Microsoft Graph PowerShell module? [Y] Yes [N] No
+        if($confirm -match "[yY]")
+        {
             Write-host "Installing Microsoft Graph PowerShell module..."
             Install-Module Microsoft.Graph -Scope CurrentUser -AllowClobber
-            Write-host "Microsoft Graph PowerShell module is installed in the machine successfully" -ForegroundColor Magenta 
-        } 
+            Write-host "Microsoft Graph PowerShell module is installed in the machine successfully" -ForegroundColor Magenta
+        }
         else
-        { 
+        {
             Write-host "Exiting. `nNote: Microsoft Graph PowerShell module must be available in your system to run the script" -ForegroundColor Red
-            Exit 
-        } 
+            Exit
+        }
     }
     Write-Progress "Importing Required Modules..."
     Import-Module -Name Microsoft.Graph.Identity.DirectoryManagement
@@ -64,7 +65,7 @@ function Connect_MgGraph {
     Connect-MgGraph -Scopes "Directory.ReadWrite.All" -NoWelcome
 }
 Function Open_OutputFile {
-    #Open output file after execution 
+    #Open output file after execution
     if ((Test-Path -Path $OutputCSVName) -eq "True") {
         if ($ActionFlag -eq "Report") {
             Write-Host Detailed license report is available in: -NoNewline -Foregroundcolor Yellow; Write-Host $OutputCSVName
@@ -72,18 +73,18 @@ Function Open_OutputFile {
         }
         elseif ($ActionFlag -eq "Mgmt") {
             Write-Host License assignment/removal log file is available in: -NoNewline -Foregroundcolor Yellow; Write-Host $OutputCSVName
-        } 
-        $Prompt = New-Object -ComObject wscript.shell  
-        $UserInput = $Prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)  
-        If ($UserInput -eq 6) {  
-            Invoke-Item "$OutputCSVName"  
-        } 
+        }
+        $Prompt = New-Object -ComObject wscript.shell
+        $UserInput = $Prompt.popup("Do you want to open output file?", 0, "Open Output File", 4)
+        If ($UserInput -eq 6) {
+            Invoke-Item "$OutputCSVName"
+        }
     }
     else {
         Write-Host No records found
     }
     Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
+    Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 3000+ Microsoft 365 reports & 450+ management actions. ~~" -ForegroundColor Green `n`n
     Write-Progress -Activity Export CSV -Completed
 }
 
@@ -93,8 +94,8 @@ Function Get_UserInfo {
     $global:UPN = $_.UserPrincipalName
     $global:Licenses = $_.AssignedLicenses.SkuId
     $SigninStatus = $_.AccountEnabled
-    if ($SigninStatus -eq $False) { 
-        $global:SigninStatus = "Disabled" 
+    if ($SigninStatus -eq $False) {
+        $global:SigninStatus = "Disabled"
     }
     else {
         $global:SigninStatus = "Enabled"
@@ -111,17 +112,17 @@ Function Get_UserInfo {
 
 Function Get_License_FriendlyName {
     $FriendlyName = @()
-    $LicensePlan = @()    
-    #Convert license plan to friendly name 
-    foreach ($License in $Licenses) {   
-        $LicenseItem = $SkuIdHash[$License]  
-        $EasyName = $FriendlyNameHash[$LicenseItem]  
+    $LicensePlan = @()
+    #Convert license plan to friendly name
+    foreach ($License in $Licenses) {
+        $LicenseItem = $SkuIdHash[$License]
+        $EasyName = $FriendlyNameHash[$LicenseItem]
         if (!($EasyName)) {
-            $NamePrint = $LicenseItem 
-        }  
+            $NamePrint = $LicenseItem
+        }
         else {
-            $NamePrint = $EasyName 
-        } 
+            $NamePrint = $EasyName
+        }
         $FriendlyName = $FriendlyName + $NamePrint
         $LicensePlan = $LicensePlan + $LicenseItem
     }
@@ -176,21 +177,21 @@ Function Remove_Licenses {
 Function main() {
     Disconnect-MgGraph -ErrorAction SilentlyContinue|Out-Null
     Connect_MgGraph
-    $Result = ""  
-    $Results = @() 
+    $Result = ""
+    $Results = @()
     $FriendlyNameHash = @{}
     Import-Csv -Path .\LicenseFriendlyName.csv -ErrorAction Stop | ForEach-Object {
     $FriendlyNameHash[$_.string_id] = $_.Product_Display_Name
 }
-    $SkuPartNumberHash = @{} 
-    $SkuIdHash = @{} 
+    $SkuPartNumberHash = @{}
+    $SkuIdHash = @{}
     Get-MgSubscribedSku -All | Select-Object SkuPartNumber, SkuId | ForEach-Object {
         $SkuPartNumberHash.add(($_.SkuPartNumber), ($_.SkuId))
         $SkuIdHash.add(($_.SkuId), ($_.SkuPartNumber))
     }
 
-    Do {                 
-        if ($Action -eq "") {                       
+    Do {
+        if ($Action -eq "") {
             Write-Host ""
             Write-host `nOffice 365 License Reporting -ForegroundColor Yellow
             Write-Host  "    1.Get all licensed users" -ForegroundColor Cyan
@@ -203,11 +204,12 @@ Function main() {
             Write-Host  "    7.Bulk:Assign multiple licenses to users (input CSV)" -ForegroundColor Cyan
             Write-Host  "    8.Remove all license from a user" -ForegroundColor Cyan
             Write-Host  "    9.Bulk:Remove all licenses from users (input CSV)" -ForegroundColor Cyan
-            Write-Host  "    10.Remove specific license from all users" -ForegroundColor Cyan
-            Write-Host  "    11.Remove all license from disabled users" -ForegroundColor Cyan
+            Write-Host  "    10.Bulk:Remove a specific license from users (input CSV)" -ForegroundColor Cyan
+            Write-Host  "    11.Remove specific license from all users" -ForegroundColor Cyan
+            Write-Host  "    12.Remove all license from disabled users" -ForegroundColor Cyan
             Write-Host  "    0.Exit" -ForegroundColor Cyan
             Write-Host ""
-            $GetAction = Read-Host 'Please choose the action to continue' 
+            $GetAction = Read-Host 'Please choose the action to continue'
         }
         else {
             $GetAction = $Action
@@ -216,7 +218,7 @@ Function main() {
         Switch ($GetAction) {
             1 {
                 $OutputCSVName = ".\O365UserLicenseReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
-                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses')
                 Write-Host Generating licensed users report...
                 $ProcessedCount = 0
                 Get-MgUser -All -Property $RequiredProperties | Where-Object {($_.AssignedLicenses.Count) -ne 0 } | ForEach-Object {
@@ -234,7 +236,7 @@ Function main() {
 
             2 {
                 $OutputCSVName = ".\O365UnlicenedUserReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
-                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses')
                 Write-Host Generating Unlicensed users report...
                 $ProcessedCount = 0
                 Get-MgUser -All -Property $RequiredProperties | Where-Object {($_.AssignedLicenses.Count) -eq 0 } | ForEach-Object {
@@ -256,7 +258,7 @@ Function main() {
                 }
                 Write-Host Getting users with $LicenseName license...
                 $ProcessedCount = 0
-                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses')
                 if ($SkuPartNumberHash.Keys -icontains $LicenseName) {
                     Get-MgUser -All -Property $RequiredProperties| Where-Object{(($_.AssignedLicenses).SkuId) -eq $SkuPartNumberHash[$LicenseName]} | ForEach-Object {
                         $ProcessedCount++
@@ -280,7 +282,7 @@ Function main() {
             4 {
                 $OutputCSVName = "./O365DiabledUsersWithLicense__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv"
                 $ProcessedCount = 0
-                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses') 
+                 $RequiredProperties=@('UserPrincipalName','DisplayName','AccountEnabled','Department','JobTitle','AssignedLicenses')
                 Write-Host Finding disabled users still licensed in Office 365...
                 Get-MgUser -All -Property $RequiredProperties| Where-Object { ($_.AccountEnabled -eq $false) -and (($_.AssignedLicenses).Count -ne 0) } | ForEach-Object {
                     $ProcessedCount++
@@ -306,11 +308,11 @@ Function main() {
                     $ActiveUnits = $_.PrepaidUnits.Enabled
                     $ConsumedUnits = $_.ConsumedUnits
                     Write-Progress -Activity "`n     Retrieving license info "`n"  Currently Processing: $LicensePlan"
-                    $EasyName = $FriendlyNameHash[$LicensePlan]  
-                    if (!($EasyName))  
-                    { $FriendlyName = $LicensePlan }  
-                    else  
-                    { $FriendlyName = $EasyName } 
+                    $EasyName = $FriendlyNameHash[$LicensePlan]
+                    if (!($EasyName))
+                    { $FriendlyName = $LicensePlan }
+                    else
+                    { $FriendlyName = $EasyName }
                     $Result = @{'AccountSkuId' = $AccountSkuID;'AccountSkuPartNumber' = $LicensePlan; 'License Plan_Friendly Name' = $FriendlyName; 'Active Units' = $ActiveUnits; 'Consumed Units' = $ConsumedUnits }
                     $Results = New-Object PSObject -Property $Result
                     $Results | select-object 'AccountSkuId','AccountSkuPartNumber', 'License Plan_Friendly Name', 'Active Units', 'Consumed Units' | Export-Csv -Path $OutputCSVName -Notype -Append
@@ -338,9 +340,9 @@ Function main() {
                         if ($UsageLocation -eq $null) {
                             Set_UsageLocation
                         }
-                       
+
                         Assign_Licenses
-                        
+
                     }
                 }
                 else {
@@ -364,7 +366,7 @@ Function main() {
                 $License = Read-Host "Enter the license names(Eg:LicensePlan1,LicensePlan2)"
                 $License = $License.Replace(' ', '')
                 $License = $License.split(",")
-                foreach ($LicenseName in $License) {  
+                foreach ($LicenseName in $License) {
                     if ($SkuPartNumberHash.Keys -inotcontains $LicenseName) {
                         $Flag = "Terminate"
                         Write-Host $LicenseName is not used in your organization. Please check the license name or run the License Usage Report to know the licenses in your org -ForegroundColor Red
@@ -382,12 +384,12 @@ Function main() {
                         if ($UsageLocation -eq $null) {
                             Set_UsageLocation
                         }
-                       
+
                         Write-Progress -Activity "`n     Assigning licenses to $UPN "`n"  Processed users: $ProcessedCount"
                         foreach ($LicenseNames in $License) {
                              Assign_Licenses
                         }
-                        
+
                     }
                 }
                 #Clearing license names and input file location for next iteration
@@ -396,7 +398,7 @@ Function main() {
                 $ActionFlag = "Mgmt"
                 Open_OutputFile
             }
-       
+
 
             8 {
                 $Identity = Read-Host Enter User UPN
@@ -409,7 +411,7 @@ Function main() {
                     $Licenses = $UserInfo.AssignedLicenses.SkuId
                     $SkuPartNumber = @()
                     if ($Licenses.count -eq 0) {
-                        Write-Host No license assigned to the user $Identity. 
+                        Write-Host No license assigned to the user $Identity.
                     }
                     else {
                         foreach ($Temp in $Licenses) {
@@ -418,9 +420,9 @@ Function main() {
                         $SkuPartNumber = $SkuPartNumber -join (",")
                         Write-Host Removing $SkuPartNumber license from $Identity
                         Set-MgUserLicense -UserId $Identity -RemoveLicenses @($Licenses) -AddLicenses @() | Out-Null
-                        Write-Host Action completed -ForegroundColor Green                        
+                        Write-Host Action completed -ForegroundColor Green
                     }
-                }  
+                }
             }
 
             9 {
@@ -442,10 +444,46 @@ Function main() {
                     }
                 }
                 $ActionFlag = "Mgmt"
-                Open_OutputFile 
+                Open_OutputFile
             }
 
             10 {
+                $OutputCSVName = "./Office365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
+                $UserNamesFile = Read-Host "Enter the CSV file containing user names(Eg:D:/UserNames.txt)"
+                #We have an input file, read it into memory
+                $UserNames = @()
+                $UserNames = Import-Csv -Header "UPN" $UserNamesFile
+                $LicenseToRemove = Read-Host "Enter the license name to remove(Eg:Enterprisepack)"
+                $ProcessedCount = 0
+                if ($SkuPartNumberHash.Keys -icontains $LicenseToRemove) {
+                    $TargetSkuId = $SkuPartNumberHash[$LicenseToRemove]
+                    foreach ($Item in $UserNames) {
+                        $UPN = $Item.UPN
+                        $ProcessedCount++
+                        $UserLicenses = (Get-MgUser -UserId $UPN -Property AssignedLicenses -ErrorAction SilentlyContinue).AssignedLicenses.SkuId
+                        if ($UserLicenses -eq $null) {
+                            "User $UPN not found or has no licenses" | Out-File $OutputCSVName -Append
+                            continue
+                        }
+                        if ($UserLicenses -contains $TargetSkuId) {
+                            $License = @($TargetSkuId)
+                            Remove_Licenses
+                        }
+                        else {
+                            "$LicenseToRemove license is not assigned to $UPN" | Out-File $OutputCSVName -Append
+                        }
+                    }
+                }
+                else {
+                    Write-Host $LicenseToRemove is not used in your organization. Please check the license name or run the License Usage Report to know the licenses in your org -ForegroundColor Red
+                }
+                $LicenseToRemove = ""
+                $UserNamesFile = ""
+                $ActionFlag = "Mgmt"
+                Open_OutputFile
+            }
+
+            11 {
                 $OutputCSVName = "./O365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
                 $Licenses = Read-Host "Enter the license name(Eg:LicensePlan)"
                 $License = $SkuPartNumberHash[$Licenses]
@@ -462,9 +500,9 @@ Function main() {
                 }
                 $ActionFlag = "Mgmt"
                 Open_OutputFile
-            }  
+            }
 
-            11 {
+            12 {
                 $OutputCSVName = "./O365LicenseRemoval_Log__$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).txt"
                 Write-Host Removing license from disabled users...
                 $ProcessedCount = 0
@@ -476,14 +514,14 @@ Function main() {
                 }
                 $ActionFlag = "Mgmt"
                 Open_OutputFile
-            } 
+            }
         }
         if ($Action -ne "") {
-            exit 
+            exit
         }
-        if ($MultipleActionsMode.ispresent) {                          
+        if ($MultipleActionsMode.ispresent) {
             Start-Sleep -Seconds 2
-        } 
+        }
         else {
             Exit
         }
