@@ -1,13 +1,17 @@
 ﻿$Shell = $Host.UI.RawUI
 $Shell.WindowTitle="SysadminGeek"
 
-$GraphScopes = @(
+$Script:GraphScopes = @(
     "User.Read.All"
 )
-$EntraScopes = @(
+$Script:EntraScopes = @(
     "User.Read.All"
 )
-$CertificateValidityPeriod = (Get-Date).AddYears(1)
+$Script:CertificateValidityPeriod = (Get-Date).AddYears(1)
+
+if (-not $Script:ConnectedTenantName) {
+    $Script:ConnectedTenantName = ""
+}
 
 Function UpdateModules {
     Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted
@@ -35,9 +39,9 @@ Function UpdateModules {
 
     $lockModules = @(
         [pscustomobject]@{Name='ExchangeOnlineManagement';keepVersion='3.9.0'} # bug certificate auth for 3.10.0 for secandcompcenter Powershell 5 en 7 AND bug with MFA auth for 3.10.1 for secandcompcenter Powershell 7
-        [pscustomobject]@{Name='Microsoft.Entra'; keepVersion='1.2.0'} # 1.3.0 still has login issues with credentials for other tenants
-        [pscustomobject]@{Name='Microsoft.Graph'; keepVersion='2.33.0'} # 2.38.0 still has login issues with credentials for other tenants
-        [pscustomobject]@{Name='Microsoft.Graph.Beta'; keepVersion='2.33.0'} # 2.38.0 still has login issues with credentials for other tenants
+        [pscustomobject]@{Name='Microsoft.Entra'; keepVersion='1.2.0'} # 1.3.0 still has login issues with credentials/WAM for other tenants
+        [pscustomobject]@{Name='Microsoft.Graph'; keepVersion='2.33.0'} # 2.39.0 still has login issues with credentials/WAM for other tenants
+        [pscustomobject]@{Name='Microsoft.Graph.Beta'; keepVersion='2.33.0'} # 2.39.0 still has login issues with credentials/WAM for other tenants
     )
 
     $modules = Get-InstalledModule
@@ -111,9 +115,28 @@ Function UpdateModules {
         $_ -notmatch '\\WindowsPowerShell\\v1\.0\\Modules\\?$'
     }
 
+    $basemodules = @(
+        "CimCmdlets",
+        "Microsoft.PowerShell.Archive",
+        "Microsoft.PowerShell.Diagnostics",
+        "Microsoft.PowerShell.Host",
+        "Microsoft.PowerShell.Management",
+        "Microsoft.PowerShell.PSResourceGet",
+        "Microsoft.PowerShell.Security",
+        "Microsoft.PowerShell.ThreadJob",
+        "Microsoft.PowerShell.Utility",
+        "Microsoft.WSMan.Management",
+        "PackageManagement",
+        "PowerShellGet",
+        "PSDiagnostics",
+        "PSReadLine",
+        "Microsoft.PowerShell.Operation.Validation",
+        "Pester"
+    )
+
     foreach ($path in $modulePaths) {
-        Get-ChildItem -Path $path -Directory | ForEach-Object {
-            if ($installed.Name -notcontains $_.Name) {
+        Get-ChildItem -Path $path -Directory -ErrorAction:SilentlyContinue | ForEach-Object {
+            if ($installed.Name -notcontains $_.Name -and $basemodules -notcontains $_.Name) {
                 Write-Host "Potential orphaned module: $($_.FullName)" -ForegroundColor Yellow
             }
         }
@@ -140,16 +163,16 @@ Function UpdateModules {
 }
 
 Function ConnectEXOnlineJSON {
-    $JSON = Get-Content "$PSScriptRoot/Tenants.json" -ErrorAction SilentlyContinue | ConvertFrom-Json
+    $JSON = Get-Content "$PSScriptRoot/Tenants.json" -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
     if (-not $JSON) {
-        $JSON = @{}
+        $JSON = [PSCustomObject]@{}
     }
 
     if (-not $JSON.Tenants) {
-        $JSON | Add-Member -MemberType NoteProperty -Name Tenants -Value (@{})
-        $JSON.Tenants = @()
+        $JSON | Add-Member -MemberType NoteProperty -Name Tenants -Value (@())
+        #$JSON.Tenants = @()
     }
-    $tenants = $JSON.Tenants
+    $tenants = @($JSON.Tenants)
 
     if($tenants.Count -eq 0)
     {
@@ -157,64 +180,64 @@ Function ConnectEXOnlineJSON {
         Start-Sleep -Seconds 2
         return
     }
-    else
-    {
-        for ($i = 0; $i -lt $tenants.Count; $i++) {
-            Write-Host "$($i+1). $($tenants[$i].Name)"
-        }
 
-        $choice = Read-Host "Select tenant"
-        if ($choice -notmatch '^\d+$' -or [int]$choice -lt 1 -or [int]$choice -gt $tenants.Count) {
-            Write-Host "Invalid selection" -ForegroundColor Red
-            Start-Sleep -Seconds 2
-            return
-        }
-        $selectedTenant = $tenants[$choice - 1]
-
-
-        Write-Host Available services: 'MSGraph','MSGraphBeta','MSTeams','SharePointOnline','SharePointPnP','SecAndCompCenter','ExchangeOnline','MSEntra' -ForegroundColor Cyan
-        $Service=Read-Host -Prompt "Which service (leave empty for all)?"
-
-        if($Service -eq ""){
-            & $PSScriptRoot/ConnectO365Services.ps1 -TenantId $selectedTenant.TenantId -AppId $selectedTenant.AppId -CertificateThumbprint $selectedTenant.CertThumbprint
-        }
-        else{
-            & $PSScriptRoot/ConnectO365Services.ps1 -TenantId $selectedTenant.TenantId -AppId $selectedTenant.AppId -CertificateThumbprint $selectedTenant.CertThumbprint -Services $Service
-        }
-
-        & GetCurrentAccounts
+    for ($i = 0; $i -lt $tenants.Count; $i++) {
+        Write-Host "$($i+1). $($tenants[$i].Name)"
     }
+
+    $choice = Read-Host "Select tenant"
+    if ($choice -notmatch '^\d+$' -or [int]$choice -lt 1 -or [int]$choice -gt $tenants.Count) {
+        Write-Host "Invalid selection" -ForegroundColor Red
+        Start-Sleep -Seconds 2
+        return
+    }
+    $selectedTenant = $tenants[$choice - 1]
+
+
+    Write-Host Available services: 'MSGraph','MSGraphBeta','MSTeams','SharePointOnline','SharePointPnP','SecAndCompCenter','ExchangeOnline','MSEntra' -ForegroundColor Cyan
+    $Service = (Read-Host -Prompt "Which service (leave empty for all)?").Trim()
+
+    if($Service -eq ""){
+        & $PSScriptRoot/ConnectO365Services.ps1 -TenantId $selectedTenant.TenantId -AppId $selectedTenant.AppId -CertificateThumbprint $selectedTenant.CertThumbprint
+    }
+    else{
+        & $PSScriptRoot/ConnectO365Services.ps1 -TenantId $selectedTenant.TenantId -AppId $selectedTenant.AppId -CertificateThumbprint $selectedTenant.CertThumbprint -Services $Service
+    }
+
+    GetCurrentAccounts
 }
 
 Function ConnectEXOnlineMFA {
     Write-Host Available services: 'MSGraph','MSGraphBeta','MSTeams','SharePointOnline','SharePointPnP','SecAndCompCenter','ExchangeOnline','MSEntra' -ForegroundColor Cyan
-    $Service=Read-Host -Prompt "Which service (leave empty for all)?"
+    $Service = (Read-Host -Prompt "Which service (leave empty for all)?").Trim()
 
     if($Service -eq ""){
-        & $PSScriptRoot/ConnectO365Services.ps1 -MFA -GraphScopes $GraphScopes -EntraScopes $EntraScopes
+        & $PSScriptRoot/ConnectO365Services.ps1 -MFA -GraphScopes $Script:GraphScopes -EntraScopes $Script:EntraScopes
     }
     else{
-        & $PSScriptRoot/ConnectO365Services.ps1 -MFA -Services $Service -GraphScopes $GraphScopes -EntraScopes $EntraScopes
+        & $PSScriptRoot/ConnectO365Services.ps1 -MFA -GraphScopes $Script:GraphScopes -EntraScopes $Script:EntraScopes -Services $Service
     }
 
-    & GetCurrentAccounts
+    GetCurrentAccounts
 }
 
 Function DisconnectEXOnline {
     & $PSScriptRoot/ConnectO365Services.ps1 -Disconnect
+    $Script:ConnectedTenantName = ""
 
     Write-Host All disconnected
 }
 
 Function GetCurrentAccounts {
-    Write-Host MSGraph: (Get-MgOrganization -ErrorAction:SilentlyContinue).DisplayName
+    $MgOrg = Get-MgOrganization -ErrorAction SilentlyContinue
+    $Script:ConnectedTenantName = $MgOrg.DisplayName
+    Write-Host MSGraph: $MgOrg.DisplayName
 
     try {
         $GetEntraUser = (Get-EntraUser -Top 1 -ErrorAction:Stop).UserPrincipalName
-        $Connected = $true
     }
     catch {
-        $Connected = $false
+        $GetEntraUser = $null
     }
     write-host Entra: $GetEntraUser
 
@@ -222,34 +245,34 @@ Function GetCurrentAccounts {
 
     try {
         $GetSPOSite = (Get-SPOSite -Limit 1 -ErrorAction:Stop).Url
-        $Connected = $true
     }
     catch {
-        $Connected = $false
+        $GetSPOSite = $null
     }
     Write-Host SharePointOnline: $GetSPOSite
 
     try {
         $GetPnPConnection = (Get-PnPConnection -ErrorAction:Stop).Url
-        $Connected = $true
     }
     catch {
-        $Connected = $false
+        $GetPnPConnection = $null
     }
     Write-Host SharePointPnP: $GetPnPConnection
+
     Write-Host "SecAndCompCenter & ExchangeOnline (returns 2 values if both connected): " (Get-ConnectionInformation -ErrorAction:SilentlyContinue).UserPrincipalName
 }
 
 function JSONentries{
-    $JSON = Get-Content "$PSScriptRoot/Tenants.json" -ErrorAction SilentlyContinue | ConvertFrom-Json
+    $JSON = Get-Content "$PSScriptRoot/Tenants.json" -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
     if (-not $JSON) {
-        $JSON = @{}
+        $JSON = [PSCustomObject]@{}
     }
 
     if (-not $JSON.Tenants) {
-        $JSON | Add-Member -MemberType NoteProperty -Name Tenants -Value (@{})
-        $JSON.Tenants = @()
+        $JSON | Add-Member -MemberType NoteProperty -Name Tenants -Value (@())
+        #$JSON.Tenants = @()
     }
+    $JSON.Tenants = @($JSON.Tenants)
 
     # Haal huidige tenant op
     $Org = Get-MgOrganization -ErrorAction SilentlyContinue
@@ -259,7 +282,7 @@ function JSONentries{
     $ExistingTenantIndex = -1
 
     for ($i = 0; $i -lt $JSON.Tenants.Count; $i++) {
-        if ($JSON.Tenants[$i].Name -eq $CurrentTenantName) {
+        if ($JSON.Tenants[$i].TenantId -eq $Org.Id) {
             $ExistingTenantIndex = $i
             break
         }
@@ -349,6 +372,7 @@ function JSONentries{
 
     # Start create application
 
+    # certificate
     $cert = Get-ChildItem -Path Cert:\CurrentUser\My\ | where { $_.subject -eq "CN=$($Shell.WindowTitle)" } -ErrorAction SilentlyContinue
     if (-not $cert)
     {
@@ -357,7 +381,7 @@ function JSONentries{
             -CertStoreLocation "Cert:\CurrentUser\My" `
             -KeySpec KeyExchange `
             -KeyLength 2048 `
-            -NotAfter $CertificateValidityPeriod
+            -NotAfter $Script:CertificateValidityPeriod
 
         Write-Host "Certificate generated" -ForegroundColor Yellow
     }
@@ -365,7 +389,7 @@ function JSONentries{
     {
         Write-Host "Existing certificate found" -ForegroundColor Yellow
     }
-    Export-Certificate -Cert $cert -FilePath $PSScriptRoot\$($Shell.WindowTitle).cer
+    Export-Certificate -Cert $cert -FilePath "$PSScriptRoot\$($Shell.WindowTitle -replace '[\\/:*?""<>|]', '_').cer"
 
     $CertThumb = $cert.Thumbprint
 
@@ -374,9 +398,29 @@ function JSONentries{
     $app = Get-MgApplication -ConsistencyLevel eventual -Filter "DisplayName eq '$($Shell.WindowTitle)'"
     if (-not $app) {
         $app = New-MgApplication -DisplayName "$($Shell.WindowTitle)"
-        $sp = New-MgServicePrincipal -AppId $app.AppId
+        $app = HELPER_Wait-ForObject `
+            -WaitingFor "application" `
+            -ScriptBlock {
+                Get-MgApplication `
+                    -Filter "appId eq '$($app.AppId)'" `
+                    -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+            }
+
+        $appSp = New-MgServicePrincipal -AppId $app.AppId
+        $appSp = HELPER_Wait-ForObject `
+            -WaitingFor "client service principal" `
+            -ScriptBlock {
+                Get-MgServicePrincipal `
+                    -Filter "appId eq '$($app.AppId)'" `
+                    -ErrorAction SilentlyContinue |
+                    Select-Object -First 1
+            }
 
         Write-Host "New App created" -ForegroundColor Yellow
+
+        Write-Host "Pause for Entra to propagate" -ForegroundColor Yellow
+        Start-Sleep -Seconds 10
     }
     else
     {
@@ -400,6 +444,7 @@ function JSONentries{
             DisplayName   = "$Env:ComputerName $([Environment]::UserName)"
             StartDateTime = $cert.NotBefore
             EndDateTime   = $cert.NotAfter
+            CustomKeyIdentifier = [System.Convert]::FromBase64String($Certificate.Thumbprint)
         }
 
         $updatedKeyCredentials = @($app.KeyCredentials) + $newKeyCredential
@@ -417,8 +462,10 @@ function JSONentries{
     $spoResourceAccess = @()
 
     # Get existing service principals
-    $appSp = Get-MgServicePrincipal `
-        -Filter "appId eq '$($app.AppId)'"
+    if (-not $appSp) {
+        $appSp = Get-MgServicePrincipal `
+            -Filter "appId eq '$($app.AppId)'"
+    }
 
     $appSpAra = Get-MgServicePrincipalAppRoleAssignment `
         -ServicePrincipalId $appSp.Id
@@ -427,7 +474,7 @@ function JSONentries{
     $graphSp = Get-MgServicePrincipal `
         -Filter "appId eq '00000003-0000-0000-c000-000000000000'"
 
-    $permissions = $GraphScopes
+    $permissions = $Script:GraphScopes
 
     foreach ($permission in $permissions) {
         $appRole = $graphSp.AppRoles |
@@ -435,6 +482,11 @@ function JSONentries{
                 $_.Value -eq $permission -and
                 $_.AllowedMemberTypes -contains "Application"
             }
+
+        if (-not $appRole) {
+            Write-Host "Permission not found or not available as application permission: $permission" -ForegroundColor Red
+            continue
+        }
 
         $existingAssignment = $appSpAra |
             Where-Object {
@@ -486,6 +538,11 @@ function JSONentries{
                 $_.AllowedMemberTypes -contains "Application"
             }
 
+        if (-not $appRole) {
+            Write-Host "Permission not found or not available as application permission: $permission" -ForegroundColor Red
+            continue
+        }
+
         $existingAssignment = $appSpAra |
             Where-Object {
                 $_.ResourceId -eq $exoSp.Id -and
@@ -536,6 +593,11 @@ function JSONentries{
                 $_.AllowedMemberTypes -contains "Application"
             }
 
+        if (-not $appRole) {
+            Write-Host "Permission not found or not available as application permission: $permission" -ForegroundColor Red
+            continue
+        }
+
         $existingAssignment = $appSpAra |
             Where-Object {
                 $_.ResourceId -eq $spoSp.Id -and
@@ -579,21 +641,35 @@ function JSONentries{
     $role = Get-MgDirectoryRole |
         Where-Object { $_.DisplayName -eq "Global Administrator" }
 
-    # Check if service principal is already a member
-    $existingMember = Get-MgDirectoryRoleMemberAsServicePrincipal -DirectoryRoleId $role.Id -All |
-        Where-Object { $_.Id -eq $appSp.Id }
-
-    if (-not $existingMember) {
-        Write-Host "Adding service principal to Global Administrator role..." -ForegroundColor Yellow
-
-        New-MgDirectoryRoleMemberByRef `
-            -DirectoryRoleId $role.Id `
-            -BodyParameter @{
-                "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($appSp.Id)"
-            }
+    if (-not $role) {
+        Write-Host "Global Administrator directory role was not found. Role may not be activated." -ForegroundColor Red
+        return
     }
     else {
-        Write-Host "Service principal is already a member of the Global Administrator role." -ForegroundColor Yellow
+        # Check if service principal is already a member
+        $existingMember = Get-MgDirectoryRoleMemberAsServicePrincipal -DirectoryRoleId $role.Id -All |
+            Where-Object { $_.Id -eq $appSp.Id }
+
+        if (-not $existingMember) {
+            $confirmGA = Read-Host "Add service principal to Global Administrator? [Y/N]"
+
+            if ($confirmGA -ne 'y') {
+                Write-Host "Skipping Global Administrator assignment" -ForegroundColor Yellow
+            }
+            else {
+                Write-Host "Adding service principal to Global Administrator role..." -ForegroundColor Yellow
+
+                New-MgDirectoryRoleMemberByRef `
+                    -DirectoryRoleId $role.Id `
+                    -BodyParameter @{
+                        "@odata.id" = "https://graph.microsoft.com/v1.0/directoryObjects/$($appSp.Id)"
+                    }
+            }
+
+        }
+        else {
+            Write-Host "Service principal is already a member of the Global Administrator role." -ForegroundColor Yellow
+        }
     }
 
     # End create application
@@ -649,6 +725,9 @@ function HELPER_Show-FunctionMenu {
     while ($true) {
         Clear-Host
         Write-Host "==== PowerShell Function Menu ====" -ForegroundColor Cyan
+        if ($Script:ConnectedTenantName -ne "" -and $Script:ConnectedTenantName -ne $null) {
+            Write-Host "Current Tenant: $($Script:ConnectedTenantName)`n" -ForegroundColor Green
+        }
         Write-Host "Select a function to run:`n"
 
         for ($i = 0; $i -lt $functionNames.Count; $i++) {
@@ -681,6 +760,32 @@ function HELPER_Show-FunctionMenu {
 
         $functionNames = $functionNames
     }
+}
+
+function HELPER_Wait-ForObject {
+    param(
+        [Parameter(Mandatory)]
+        [scriptblock]$ScriptBlock,
+
+        [int]$TimeoutSeconds = 60,
+        [int]$DelaySeconds = 3,
+        [string]$WaitingFor = "object"
+    )
+
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+    do {
+        $result = & $ScriptBlock
+
+        if ($result) {
+            return $result
+        }
+
+        Start-Sleep -Seconds $DelaySeconds
+    }
+    while ($stopwatch.Elapsed.TotalSeconds -lt $TimeoutSeconds)
+
+    throw "Timed out waiting for $WaitingFor."
 }
 
 function HELPER_Test-NoPowerShellArguments {
