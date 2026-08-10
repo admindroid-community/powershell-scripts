@@ -259,7 +259,7 @@ else
     {
      if(($PSVersionTable::PSVersion.Major) -ge 7)
      {
-      $JSON = Get-Content "$PSScriptRoot/Tenants.json" -ErrorAction SilentlyContinue | ConvertFrom-Json
+      $JSON = Get-Content "$PSScriptRoot/Tenants.json" -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
 
       if (-not $JSON) {
        $JSON = [PSCustomObject]@{}
@@ -290,7 +290,7 @@ else
         $PnPClientID = $PnPapp.AppId
        }
        $JSON.PnP7 | Add-Member -MemberType NoteProperty -Name $SharePointHostName -Value $PnPClientID
-       $JSON.PnP7.$SharePointHostName = $PnPClientID
+       #$JSON.PnP7.$SharePointHostName = $PnPClientID
       }
 
       $JSON | ConvertTo-Json | Set-Content -Path "$PSScriptRoot/Tenants.json"
