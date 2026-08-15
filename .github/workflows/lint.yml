@@ -1,0 +1,64 @@
+name: Lint and test
+
+on:
+  push:
+    branches: [ '**' ]
+  pull_request:
+    branches: [ '**' ]
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: PSScriptAnalyzer + toolkit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+
+      - name: Parse-check every script
+        shell: pwsh
+        run: |
+          $failed = 0
+          Get-ChildItem -Recurse -Include *.ps1,*.psm1,*.psd1 -File |
+            Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' } |
+            ForEach-Object {
+              $errors = $null
+              $null = [System.Management.Automation.Language.Parser]::ParseFile(
+                        $_.FullName, [ref]$null, [ref]$errors)
+              if ($errors -and $errors.Count -gt 0) {
+                $failed++
+                Write-Host "::error file=$($_.FullName)::$($errors[0].Message)"
+              }
+            }
+          if ($failed -gt 0) { throw "$failed file(s) failed to parse." }
+          Write-Host "All files parsed successfully."
+
+      - name: Analyze the toolkit
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path ./M365Toolkit -Recurse -Severity Error,Warning `
+                       -ExcludeRule PSUseShouldProcessForStateChangingFunctions,
+                                    PSAvoidUsingWriteHost,
+                                    PSUseSingularNouns
+          if ($results) {
+            $results | Format-Table -AutoSize | Out-String -Width 200 | Write-Host
+            $errors = @($results | Where-Object Severity -eq 'Error')
+            if ($errors.Count -gt 0) { throw "$($errors.Count) analyzer error(s) in M365Toolkit." }
+          } else {
+            Write-Host "PSScriptAnalyzer reported no issues."
+          }
+
+      - name: Run toolkit smoke tests
+        shell: pwsh
+        run: ./Tools/Test-M365Toolkit.ps1
+
+      - name: Repository audit (informational)
+        shell: pwsh
+        continue-on-error: true
+        run: ./Tools/Invoke-RepoAudit.ps1 -MinimumSeverity Error

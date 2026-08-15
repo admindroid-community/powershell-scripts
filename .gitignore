@@ -1,0 +1,34 @@
+# Generated reports - the scripts and toolkit write these into the working directory
+*.csv
+*.html
+*.htm
+*.json
+!**/LicenseFriendlyName.csv
+!**/ServicePlansFrndlyName.csv
+!**/*.template.json
+
+# Logs and transcripts
+*.log
+Transcript*.txt
+
+# Credentials and certificates - never commit these
+*.pfx
+*.cer
+*.pem
+*.key
+secrets.*
+appsettings.local.*
+
+# PowerShell module output
+**/bin/
+**/obj/
+*.nupkg
+
+# Editor / OS noise
+.vs/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

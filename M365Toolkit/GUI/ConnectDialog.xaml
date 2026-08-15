@@ -1,0 +1,88 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Connect to Microsoft 365"
+    Height="560" Width="520"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="NoResize"
+    Background="#FFF6F7F9">
+
+  <Window.Resources>
+    <Style TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="Segoe UI"/>
+      <Setter Property="Margin" Value="0,10,0,3"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style TargetType="TextBox">
+      <Setter Property="Padding" Value="6"/>
+      <Setter Property="BorderBrush" Value="#FFDDE1E6"/>
+      <Setter Property="FontFamily" Value="Segoe UI"/>
+    </Style>
+    <Style TargetType="Button">
+      <Setter Property="Background" Value="#FF2563EB"/>
+      <Setter Property="Foreground" Value="White"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="16,7"/>
+      <Setter Property="Margin" Value="8,0,0,0"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+  </Window.Resources>
+
+  <Grid Margin="18">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0">
+      <TextBlock Text="Services" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,6"/>
+      <WrapPanel>
+        <CheckBox x:Name="ChkGraph" Content="Microsoft Graph" IsChecked="True" Margin="0,0,16,0" FontFamily="Segoe UI"/>
+        <CheckBox x:Name="ChkExo"   Content="Exchange Online" IsChecked="True" Margin="0,0,16,0" FontFamily="Segoe UI"/>
+        <CheckBox x:Name="ChkPnp"   Content="SharePoint (PnP)" Margin="0,0,16,0" FontFamily="Segoe UI"/>
+        <CheckBox x:Name="ChkTeams" Content="Teams" FontFamily="Segoe UI"/>
+      </WrapPanel>
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,12,0,0">
+      <StackPanel>
+        <TextBlock Text="Authentication" FontWeight="SemiBold" FontSize="14" Margin="0,0,0,4"/>
+        <RadioButton x:Name="RadInteractive" Content="Interactive sign-in (ad-hoc use)"
+                     IsChecked="True" GroupName="Auth" FontFamily="Segoe UI" Margin="0,4,0,0"/>
+        <RadioButton x:Name="RadCert" Content="Certificate (app registration - unattended and scheduled runs)"
+                     GroupName="Auth" FontFamily="Segoe UI" Margin="0,6,0,0"/>
+
+        <Border Background="#FFFFF7ED" BorderBrush="#FFFDBA74" BorderThickness="1"
+                CornerRadius="4" Padding="9" Margin="0,10,0,0">
+          <TextBlock TextWrapping="Wrap" Margin="0" FontSize="11" Foreground="#FF9A3412"
+                     Text="Username and password authentication is not offered: Exchange Online no longer accepts basic authentication. Use certificate auth for anything scheduled."/>
+        </Border>
+
+        <TextBlock Text="Tenant ID"/>
+        <TextBox x:Name="TxtTenantId"/>
+
+        <TextBlock Text="Client ID (application ID)"/>
+        <TextBox x:Name="TxtClientId"/>
+
+        <TextBlock Text="Certificate thumbprint"/>
+        <TextBox x:Name="TxtThumbprint"/>
+
+        <TextBlock Text="Organization (contoso.onmicrosoft.com) - needed for Exchange Online and PnP"/>
+        <TextBox x:Name="TxtOrganization"/>
+
+        <TextBlock Text="SharePoint URL - needed for PnP"/>
+        <TextBox x:Name="TxtSharePointUrl"/>
+
+        <CheckBox x:Name="ChkInstall" Content="Install any missing modules for the current user"
+                  FontFamily="Segoe UI" Margin="0,14,0,0"/>
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+      <Button x:Name="BtnCancel" Content="Cancel" Background="#FF64748B"/>
+      <Button x:Name="BtnOk" Content="Connect"/>
+    </StackPanel>
+  </Grid>
+</Window>

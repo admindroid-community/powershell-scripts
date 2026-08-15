@@ -1,5 +1,33 @@
 ## PowerShell Scripts for Microsoft 365 Management, Reporting, and Auditing
 
+---
+
+> ### 🛠️ This fork adds M365Toolkit — a GUI console for day-to-day M365 engineering
+>
+> The scripts below are a useful reference, but each one re-implements its own connection
+> logic, prints with `Write-Host`, and writes CSV from inside the script body. Several
+> depend on the **retired MSOnline / AzureAD modules** and no longer run at all.
+>
+> **[`M365Toolkit/`](M365Toolkit/README.md)** consolidates the most-used capabilities into
+> one module with a WPF console: 33 tasks on modern Microsoft Graph and Exchange Online
+> cmdlets, one shared certificate-based authentication layer, pipeline-first output, and
+> confirmation gating on anything that writes.
+>
+> ```powershell
+> .\Start-M365Console.ps1          # GUI
+>
+> Import-Module .\M365Toolkit\M365Toolkit.psd1
+> Get-M365Task                     # browse the catalog
+> Invoke-M365Task -Id 'licensing.unused-licenses'
+> ```
+>
+> - **[REVIEW.md](REVIEW.md)** — full audit of all 168 scripts and what's broken
+> - **[M365Toolkit/README.md](M365Toolkit/README.md)** — usage, task catalog, extending it
+> - **[Tools/Invoke-RepoAudit.ps1](Tools/Invoke-RepoAudit.ps1)** — the repeatable audit
+> - **[Tools/Test-M365Toolkit.ps1](Tools/Test-M365Toolkit.ps1)** — smoke tests
+
+---
+
 ### Introduction
 
 Welcome to our comprehensive PowerShell repository containing hundreds of scripts tailored for managing, reporting, and auditing Microsoft 365 environments. These scripts are designed to assist IT administrators in automating routine tasks, gathering detailed reports, and ensuring compliance across their Microsoft 365 tenant.
