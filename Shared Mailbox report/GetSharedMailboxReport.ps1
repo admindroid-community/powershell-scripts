@@ -1,7 +1,7 @@
-﻿<#
+<#
 =============================================================================================
 Name:           Export all shared mailboxes in Office 365
-Version:        1.0
+Version:        2.0
 Website:        o365reports.com
 
 Script Highlights: 
@@ -11,8 +11,13 @@ Script Highlights:
 3.Exports report results to CSV file.    
 4.It helps to identify shared mailboxes with licenses separately.  
 5.Helps to track email forwarding configured shared mailboxes. 
-6.Automatically installs the EXO V2 module (if not installed already) upon your confirmation.   
-7.The script is scheduler-friendly. I.e., Credentials can be passed as a parameter instead of getting interactively.
+6.Automatically installs the EXO module (if not installed already) upon your confirmation.   
+7.Supports Certificate-based Authentication (CBA) and is scheduler-friendly.
+
+Change Log:
+~~~~~~~~~~
+    V1.0 (Jul 13, 2022) - File created
+    V2.0 (Nov 16, 2026) - Fixed the export stopping at 1000 shared mailboxes, migrated to EXO cmdlets, and replaced username/password authentication with CBA
 
 For detailed script execution:  https://o365reports.com/2022/07/13/get-shared-mailbox-in-office-365-using-powershell
 ============================================================================================
@@ -22,67 +27,77 @@ For detailed script execution:  https://o365reports.com/2022/07/13/get-shared-ma
     [switch]$LicensedOnly,
     [switch]$EmailForwardingEnabled,
     [switch]$FullAccessOnly,
-    [string]$UserName,
-    [string]$Password
+    [string]$Organization,
+    [string]$ClientId,
+    [string]$CertificateThumbprint
 )
 
-Function Connect_Exo
-{
- #Check for EXO v2 module inatallation
- $Module = Get-Module ExchangeOnlineManagement -ListAvailable
- if($Module.count -eq 0) 
- { 
-  Write-Host Exchange Online PowerShell V2 module is not available  -ForegroundColor yellow  
-  $Confirm= Read-Host Are you sure you want to install module? [Y] Yes [N] No 
-  if($Confirm -match "[yY]") 
-  { 
-   Write-host "Installing Exchange Online PowerShell module"
-   Install-Module ExchangeOnlineManagement -Repository PSGallery -AllowClobber -Force
-   Import-Module ExchangeOnlineManagement
-  } 
-  else 
-  { 
-   Write-Host EXO V2 module is required to connect Exchange Online.Please install module using Install-Module ExchangeOnlineManagement cmdlet. 
-   Exit
-  }
- } 
- Write-Host Connecting to Exchange Online...
- #Storing credential in script for scheduling purpose/ Passing credential as parameter - Authentication using non-MFA account
- if(($UserName -ne "") -and ($Password -ne ""))
- {
-  $SecuredPassword = ConvertTo-SecureString -AsPlainText $Password -Force
-  $Credential  = New-Object System.Management.Automation.PSCredential $UserName,$SecuredPassword
-  Connect-ExchangeOnline -Credential $Credential
- }
- else
- {
-  Connect-ExchangeOnline
- }
+# Module check
+
+Function Connect-ExchangeOnlineSession {
+    $ExchangeOnlineModule = Get-Module ExchangeOnlineManagement -ListAvailable
+    if ($null -eq $ExchangeOnlineModule) {
+        Write-Host "`nImportant: Exchange Online module is unavailable. It is mandatory to have this module installed in the system to run the script successfully."
+        $Confirm = Read-Host "Are you sure you want to install Exchange Online module? [Y] Yes [N] No"
+        if ($Confirm -match "[yY]") {
+            Write-Host "Installing Exchange Online module..."
+            Install-Module ExchangeOnlineManagement -Scope CurrentUser -AllowClobber
+            Write-Host "Exchange Online module is installed in the machine successfully." -ForegroundColor Magenta
+        }
+        else {
+            Write-Host "Exiting.`nNote: Exchange Online module must be available in your system to run the script." -ForegroundColor Red
+            Exit
+        }
+    }
+
+    Import-Module ExchangeOnlineManagement
+
+    Write-Host "`nConnecting to Exchange Online..."
+    if ($UseCBA) {
+        Connect-ExchangeOnline -AppId $ClientId -CertificateThumbprint $CertificateThumbprint `
+            -Organization $Organization -ShowBanner:$false -ErrorAction Stop
+    }
+    else {
+        Connect-ExchangeOnline -ShowBanner:$false -ErrorAction Stop
+    }
+    Write-Host "Connected to Exchange Online successfully." -ForegroundColor Green
 }
-Connect_Exo
+
+# CBA needs all three application parameters.
+$CBAParameters = @($Organization, $ClientId, $CertificateThumbprint) |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+$UseCBA = $CBAParameters.Count -eq 3
+
+if ($CBAParameters.Count -gt 0 -and -not $UseCBA) {
+    Write-Host "Certificate-based authentication requires -Organization, -ClientId, and -CertificateThumbprint together." -ForegroundColor Red
+    return
+}
+
+Connect-ExchangeOnlineSession
 $OutputCSV=".\SharedMailboxReport_$((Get-Date -format yyyy-MMM-dd-ddd` hh-mm` tt).ToString()).csv" 
 $Count=0
 $OutputCount=0
 $ExportResult=""   
 $ExportResults=@()
 
-#Retrieve all the shared mailboxes
-Get-Mailbox -ResultSize Unlimited -RecipientTypeDetails SharedMailbox | foreach {
+#Retrieve all the shared mailboxes before processing
+$SharedMailboxes = Get-EXOMailbox -ResultSize Unlimited -RecipientTypeDetails SharedMailbox -Properties DisplayName,ArchiveStatus,LitigationHoldEnabled,RetentionHoldEnabled,SkuAssigned,AuditEnabled,HiddenFromAddressListsEnabled,ForwardingAddress,ForwardingSmtpAddress
+foreach ($Mailbox in $SharedMailboxes) {
  $Print=$true
  $Count++
- $Name=$_.Name
+ $Name=$Mailbox.DisplayName
  Write-Progress -Activity "`n     Processing $Name.."`n" Processed mailbox count: $Count"
- $PrimarySMTPAddress=$_.PrimarySMTPAddress
- $UPN=$_.UserPrincipalName
- $Alias=$_.Alias
- $ArchiveStatus=$_.ArchiveStatus
- $LitigationHold=$_.LitigationHoldEnabled
- $RetentionHold=$_.RetentionHoldEnabled
- $IsLicensed=$_.SkuAssigned
- $AuditEnabled=$_.AuditEnabled
- $HideFromAddressList=$_.HiddenFromAddressListsEnabled
- $ForwardingAddress=$_.ForwardingAddress
- $ForwardingSMTPAddress=$_.ForwardingSMTPAddress
+ $PrimarySMTPAddress=$Mailbox.PrimarySMTPAddress
+ $UPN=$Mailbox.UserPrincipalName
+ $Alias=$Mailbox.Alias
+ $ArchiveStatus=$Mailbox.ArchiveStatus
+ $LitigationHold=$Mailbox.LitigationHoldEnabled
+ $RetentionHold=$Mailbox.RetentionHoldEnabled
+ $IsLicensed=$Mailbox.SkuAssigned
+ $AuditEnabled=$Mailbox.AuditEnabled
+ $HideFromAddressList=$Mailbox.HiddenFromAddressListsEnabled
+ $ForwardingAddress=$Mailbox.ForwardingAddress
+ $ForwardingSMTPAddress=$Mailbox.ForwardingSMTPAddress
  if($ForwardingAddress -eq $null)
  {
   $ForwardingAddress="-"
@@ -92,7 +107,7 @@ Get-Mailbox -ResultSize Unlimited -RecipientTypeDetails SharedMailbox | foreach 
   $ForwardingSMTPAddress="-"
  }
 
- $MBSize=((Get-MailboxStatistics -Identity $UPN).totalItemSize.value)
+ $MBSize=((Get-EXOMailboxStatistics -Identity $UPN).TotalItemSize)
  $MailboxSize=$MBSize.ToString().split("(") | Select-Object -Index 0
   If(($LicensedOnly.IsPresent) -and ($IsLicensed -eq $false))
  {
@@ -113,6 +128,11 @@ Get-Mailbox -ResultSize Unlimited -RecipientTypeDetails SharedMailbox | foreach 
   }
 }
  
+Write-Host "`n~~ Script prepared by AdminDroid Community ~~`n" -ForegroundColor Green
+Write-Host "~~ Check out " -NoNewline -ForegroundColor Green
+Write-Host "admindroid.com" -NoNewline -ForegroundColor Yellow
+Write-Host " to get access to 3500+ Microsoft 365 reports and 450+ management actions. ~~`n`n" -ForegroundColor Green
+
 #Open output file after execution
 If($OutputCount -eq 0)
 {
@@ -131,8 +151,6 @@ else
   {   
    Invoke-Item "$OutputCSV"   
   }
-Write-Host `n~~ Script prepared by AdminDroid Community ~~`n -ForegroundColor Green
-Write-Host "~~ Check out " -NoNewline -ForegroundColor Green; Write-Host "admindroid.com" -ForegroundColor Yellow -NoNewline; Write-Host " to get access to 1800+ Microsoft 365 reports. ~~" -ForegroundColor Green `n`n
  }
 }
 
